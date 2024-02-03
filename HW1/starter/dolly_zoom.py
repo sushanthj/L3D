@@ -58,8 +58,7 @@ def dolly_zoom(
         draw = ImageDraw.Draw(image)
         draw.text((20, 20), f"fov: {fovs[i]:.2f}", fill=(255, 0, 0))
         images.append(np.array(image))
-    imageio.mimsave(output_file, images, fps=(num_frames / duration), )
-
+    imageio.mimsave(output_file, images, fps=(num_frames / duration), loop=3)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
