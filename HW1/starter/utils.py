@@ -86,7 +86,7 @@ def unproject_depth_image(image, mask, depth, camera):
         mask (torch.Tensor): A binary mask for the image (S, S).
         depth (torch.Tensor): The depth map of the image (S, S).
         camera: The Pytorch3D camera to render the image.
-    
+
     Returns:
         points (torch.Tensor): The 3D points of the unprojected image (N, 3).
         rgba (torch.Tensor): The rgba color values corresponding to the unprojected
@@ -97,13 +97,14 @@ def unproject_depth_image(image, mask, depth, camera):
     image_shape = image.shape[0]
     ndc_pixel_coordinates = torch.linspace(1, -1, image_shape)
     Y, X = torch.meshgrid(ndc_pixel_coordinates, ndc_pixel_coordinates)
+    depth = torch.from_numpy(depth).to(device)
     xy_depth = torch.dstack([X, Y, depth])
     points = camera.unproject_points(
         xy_depth.to(device), in_ndc=False, from_ndc=False, world_coordinates=True,
     )
     points = points[mask > 0.5]
     rgb = image[mask > 0.5]
-    rgb = rgb.to(device)
+    rgb = torch.from_numpy(rgb).to(device)
 
     # For some reason, the Pytorch3D compositor does not apply a background color
     # unless the pointcloud is RGBA.

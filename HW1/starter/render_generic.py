@@ -14,14 +14,73 @@ import mcubes
 import numpy as np
 import pytorch3d
 import torch
+import imageio
 
-from starter.utils import get_device, get_mesh_renderer, get_points_renderer
+from starter.utils import get_device, get_mesh_renderer, get_points_renderer, unproject_depth_image
 
 
 def load_rgbd_data(path="data/rgbd_data.pkl"):
+    """
+    rgb_data.keys() = dict_keys(['rgb1', 'mask1', 'depth1',
+                                'rgb2', 'mask2', 'depth2',
+                                'cameras1', 'cameras2'])
+    """
     with open(path, "rb") as f:
         data = pickle.load(f)
     return data
+
+
+def render_first_pointcloud(
+    image_size=256,
+    background_color=(1, 1, 1),
+    device=None,
+):
+    """
+    Renders a point cloud.
+    """
+    if device is None:
+        device = get_device()
+    renderer = get_points_renderer(
+        image_size=image_size, background_color=background_color)
+    rgb_data = load_rgbd_data()
+
+    points, rgb = unproject_depth_image(rgb_data.get("rgb1"), rgb_data.get("mask1"),
+                                        rgb_data.get("depth1"), rgb_data.get("cameras1"))
+    # extend points to 12 views
+    num_views = 12
+    points = points.unsqueeze(0).to(device)
+    rgb = rgb.unsqueeze(0).to(device)
+    points = points.expand(num_views, -1, -1)
+    rgb = rgb.expand(num_views, -1, -1)
+    import ipdb
+    # ipdb.set_trace()
+    point_cloud = pytorch3d.structures.Pointclouds(points=points, features=rgb)
+    R, T = pytorch3d.renderer.look_at_view_transform(
+        dist=6,
+        elev=0,
+        azim=np.linspace(-180, 180, num_views, endpoint=False),
+    )
+
+    # Additional rotation of 180 degrees about the z-axis
+    additional_rotation = torch.tensor([[-1, 0, 0],
+                                        [0, -1, 0],
+                                        [0, 0, 1]], dtype=R.dtype, device=R.device)
+    additional_rotation = additional_rotation.unsqueeze(0).expand(num_views, -1, -1)
+
+    # Apply additional rotation to the original rotations
+    R_additional = R @ additional_rotation
+
+    many_cameras = pytorch3d.renderer.FoVPerspectiveCameras(
+        R=R_additional,
+        T=T,
+        device=device
+    )
+
+    images = renderer(point_cloud, cameras=many_cameras)
+    images = images.cpu().numpy()
+    img_list = [np.clip((img.squeeze() * 255).astype(np.uint8), 0, 255)[:,:,0:3] for img in images]
+    imageio.mimsave('images/first_pointcloud_360.gif', img_list, loop=10, duration = 0.05)
+    return img_list[0]
 
 
 def render_bridge(
@@ -112,7 +171,7 @@ if __name__ == "__main__":
         "--render",
         type=str,
         default="point_cloud",
-        choices=["point_cloud", "parametric", "implicit"],
+        choices=["point_cloud", "point_cloud_first", "parametric", "implicit"],
     )
     parser.add_argument("--output_path", type=str, default="images/bridge.jpg")
     parser.add_argument("--image_size", type=int, default=256)
@@ -120,6 +179,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.render == "point_cloud":
         image = render_bridge(image_size=args.image_size)
+    elif args.render == "point_cloud_first":
+        image = render_first_pointcloud(image_size=args.image_size)
     elif args.render == "parametric":
         image = render_sphere(image_size=args.image_size, num_samples=args.num_samples)
     elif args.render == "implicit":

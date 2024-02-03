@@ -63,7 +63,7 @@ def render_cow(
             "Camera": cameras,
         }
     })
-    fig.show()
+    # fig.show()
 
     return rend[0, ..., :3].cpu().numpy()
 
