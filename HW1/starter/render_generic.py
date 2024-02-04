@@ -235,6 +235,128 @@ def render_sphere(image_size=256, num_samples=200, device=None):
     return rend[0, ..., :3].cpu().numpy()
 
 
+def render_torus(image_size=256, num_samples=200, device=None):
+    """
+    Renders a Torus
+    """
+    background_color=(1, 1, 1)
+    if device is None:
+        device = get_device()
+    renderer = get_points_renderer(
+    image_size=image_size, background_color=background_color)
+    R = 1
+    r = 0.5
+    phi = torch.linspace(0, 2 * np.pi, num_samples)
+    theta = torch.linspace(0, 2 * np.pi, num_samples)
+    Phi, Theta = torch.meshgrid(phi, theta)
+    x = (R + r * torch.cos(Phi)) * torch.cos(Theta)
+    y = (R + r * torch.cos(Phi)) * torch.sin(Theta)
+    z = r * torch.sin(Phi)
+
+    num_views = 12
+    points = torch.stack((x.flatten(), y.flatten(), z.flatten()), dim=1)
+    color = (points - points.min()) / (points.max() - points.min())
+
+    points = points.unsqueeze(0).expand(num_views, -1, -1)
+    color = color.unsqueeze(0).expand(num_views, -1, -1)
+
+    torus_point_cloud = pytorch3d.structures.Pointclouds(
+        points=points, features=color,
+    ).to(device)
+
+    R, T = pytorch3d.renderer.look_at_view_transform(
+        dist=6,
+        elev=0,
+        azim=np.linspace(-180, 180, num_views, endpoint=False),
+    )
+
+    # Additional rotation of 20 degrees about the x-axis
+    additional_rotation = torch.tensor([[1,  0, 0],
+                                        [0, np.cos(np.radians(20)), np.sin(np.radians(20))],
+                                        [0,  -np.sin(np.radians(20)), np.cos(np.radians(20))]],
+                                        dtype=R.dtype, device=R.device)
+    additional_rotation = additional_rotation.unsqueeze(0).expand(num_views, -1, -1)
+
+    # Apply additional rotation to the original rotations
+    R_additional = R @ additional_rotation
+
+    many_cameras = pytorch3d.renderer.FoVPerspectiveCameras(
+        R=R_additional,
+        T=T,
+        device=device
+    )
+
+    images = renderer(torus_point_cloud, cameras=many_cameras)
+    images = images.cpu().numpy()
+    img_list = [np.clip((img.squeeze() * 255).astype(np.uint8), 0, 255)[:,:,0:3] for img in images]
+    imageio.mimsave('images/torus_pointcloud_360.gif', img_list, loop=10, duration = 0.05)
+    return img_list[0]
+
+
+def render_custom_shape(image_size=256, num_samples=200, device=None):
+    """
+    Renders a new shape
+    """
+    background_color=(1, 1, 1)
+    if device is None:
+        device = get_device()
+    renderer = get_points_renderer(
+    image_size=image_size, background_color=background_color)
+
+    def hyperboloid(u, v, a=1):
+        x = a * np.cosh(u) * np.cos(v)
+        y = a * np.cosh(u) * np.sin(v)
+        z = a * np.sinh(u)
+        return x, y, z
+
+    # Generate u and v values
+    u = torch.linspace(-2, 2, 100)
+    v = torch.linspace(0, 2 * np.pi, 100)
+    u, v = torch.meshgrid(u, v)
+
+    # Generate hyperboloid points
+    x, y, z = hyperboloid(u, v)
+
+    num_views = 12
+    points = torch.stack((x.flatten(), y.flatten(), z.flatten()), dim=1)
+    color = (points - points.min()) / (points.max() - points.min())
+
+    points = points.unsqueeze(0).expand(num_views, -1, -1)
+    color = color.unsqueeze(0).expand(num_views, -1, -1)
+
+    hyperboloid_point_cloud = pytorch3d.structures.Pointclouds(
+        points=points, features=color,
+    ).to(device)
+
+    R, T = pytorch3d.renderer.look_at_view_transform(
+        dist=6,
+        elev=0,
+        azim=np.linspace(-180, 180, num_views, endpoint=False),
+    )
+
+    # Additional rotation of 10 degrees about the x-axis
+    additional_rotation = torch.tensor([[1,  0, 0],
+                                        [0, np.cos(np.radians(80)), np.sin(np.radians(80))],
+                                        [0,  -np.sin(np.radians(80)), np.cos(np.radians(80))]],
+                                        dtype=R.dtype, device=R.device)
+    additional_rotation = additional_rotation.unsqueeze(0).expand(num_views, -1, -1)
+
+    # Apply additional rotation to the original rotations
+    R_additional = R @ additional_rotation
+
+    many_cameras = pytorch3d.renderer.FoVPerspectiveCameras(
+        R=R_additional,
+        T=T,
+        device=device
+    )
+
+    images = renderer(hyperboloid_point_cloud, cameras=many_cameras)
+    images = images.cpu().numpy()
+    img_list = [np.clip((img.squeeze() * 255).astype(np.uint8), 0, 255)[:,:,0:3] for img in images]
+    imageio.mimsave('images/custom_hyperbolloid_pointcloud_360.gif', img_list, loop=10, duration = 0.05)
+    return img_list[0]
+
+
 def render_sphere_mesh(image_size=256, voxel_size=64, device=None):
     if device is None:
         device = get_device()
@@ -269,7 +391,7 @@ if __name__ == "__main__":
         type=str,
         default="point_cloud",
         choices=["point_cloud", "point_cloud_first", "point_cloud_second",
-                 "point_cloud_composite", "parametric", "implicit"],
+                 "point_cloud_composite", "torus", "custom_shape", "parametric", "implicit"],
     )
     parser.add_argument("--output_path", type=str, default="images/bridge.jpg")
     parser.add_argument("--image_size", type=int, default=256)
@@ -285,6 +407,10 @@ if __name__ == "__main__":
         image = render_composite_cloud(image_size=args.image_size)
     elif args.render == "parametric":
         image = render_sphere(image_size=args.image_size, num_samples=args.num_samples)
+    elif args.render == "torus":
+        image = render_torus(image_size=args.image_size, num_samples=args.num_samples)
+    elif args.render == "custom_shape":
+        image = render_custom_shape(image_size=args.image_size, num_samples=args.num_samples)
     elif args.render == "implicit":
         image = render_sphere_mesh(image_size=args.image_size)
     else:
