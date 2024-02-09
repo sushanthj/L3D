@@ -33,16 +33,16 @@ def render_cow(
 
     ######## 2. 90 degree counterclock rotation of camera about y ################
     # R_relative = [[0, 0, -1], [0, 1, 0], [1, 0, 0]]
-    # T_relative = [3, 0, 3] ###! ASK HOW?
+    # T_relative = [3, 0, 3]
 
     ######## 3. Move camera away from the cow ################
     # R_relative = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     # T_relative = [0, 0, 3]
 
     ######## 4. Move camera sideways from the cow and lift up ################
-    # theta = np.radians(0)
-    # R_relative = [[1, 0, 0], [0, np.cos(-theta), -np.sin(-theta)], [0, np.sin(-theta), np.cos(-theta)]]
-    # T_relative = [0.5, -0.5, 0]
+    theta = np.radians(10)
+    R_relative = [[1, 0, 0], [0, np.cos(-theta), -np.sin(-theta)], [0, np.sin(-theta), np.cos(-theta)]]
+    T_relative = [0.5, -0.5, 0]
 
     R_relative = torch.tensor(R_relative).float()
     T_relative = torch.tensor(T_relative).float()

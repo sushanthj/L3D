@@ -52,7 +52,7 @@ def get_points_renderer(
     return renderer
 
 
-def get_mesh_renderer(image_size=512, lights=None, device=None):
+def get_mesh_renderer(image_size=512, lights=None, device=None, bin_size=None):
     """
     Returns a Pytorch3D Mesh Renderer.
 
@@ -67,9 +67,14 @@ def get_mesh_renderer(image_size=512, lights=None, device=None):
             device = torch.device("cuda:0")
         else:
             device = torch.device("cpu")
-    raster_settings = RasterizationSettings(
-        image_size=image_size, blur_radius=0.0, faces_per_pixel=1,
-    )
+    if bin_size is not None:
+        raster_settings = RasterizationSettings(
+            image_size=image_size, blur_radius=0.0, faces_per_pixel=1,
+        )
+    else:
+        raster_settings = RasterizationSettings(
+            image_size=image_size, blur_radius=0.0, faces_per_pixel=1, bin_size=bin_size,
+        )
     renderer = MeshRenderer(
         rasterizer=MeshRasterizer(raster_settings=raster_settings),
         shader=HardPhongShader(device=device, lights=lights),
