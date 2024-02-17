@@ -2,6 +2,7 @@
 *.pkl
 *.csv
 *.npz
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

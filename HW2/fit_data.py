@@ -23,7 +23,7 @@ def get_args_parser():
     parser.add_argument('--n_points', default=5000, type=int)
     parser.add_argument('--w_chamfer', default=1.0, type=float)
     parser.add_argument('--w_smooth', default=0.1, type=float)
-    parser.add_argument('--device', default='cuda', type=str) 
+    parser.add_argument('--device', default='cuda', type=str)
     return parser
 
 def fit_mesh(mesh_src, mesh_tgt, args):
@@ -48,23 +48,26 @@ def fit_mesh(mesh_src, mesh_tgt, args):
 
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()        
+        optimizer.step()
 
         total_time = time.time() - start_time
         iter_time = time.time() - iter_start_time
 
         loss_vis = loss.cpu().item()
 
-        print("[%4d/%4d]; ttime: %.0f (%.2f); loss: %.3f" % (step, args.max_iter, total_time,  iter_time, loss_vis))        
-    
+        print("[%4d/%4d]; ttime: %.0f (%.2f); loss: %.3f" % (step, args.max_iter, total_time,  iter_time, loss_vis))
+
     mesh_src.offset_verts_(deform_vertices_src)
 
     print('Done!')
 
 
 def fit_pointcloud(pointclouds_src, pointclouds_tgt, args):
+    # visualize pointcloud before gradient descent
+    # TODO
+
     start_iter = 0
-    start_time = time.time()    
+    start_time = time.time()
     optimizer = torch.optim.Adam([pointclouds_src], lr = args.lr)
     for step in range(start_iter, args.max_iter):
         iter_start_time = time.time()
@@ -73,7 +76,7 @@ def fit_pointcloud(pointclouds_src, pointclouds_tgt, args):
 
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()        
+        optimizer.step()
 
         total_time = time.time() - start_time
         iter_time = time.time() - iter_start_time
@@ -81,13 +84,16 @@ def fit_pointcloud(pointclouds_src, pointclouds_tgt, args):
         loss_vis = loss.cpu().item()
 
         print("[%4d/%4d]; ttime: %.0f (%.2f); loss: %.3f" % (step, args.max_iter, total_time,  iter_time, loss_vis))
-    
+
     print('Done!')
+
+    # visualize after gradient descent
+    # TODO
 
 
 def fit_voxel(voxels_src, voxels_tgt, args):
     start_iter = 0
-    start_time = time.time()    
+    start_time = time.time()
     optimizer = torch.optim.Adam([voxels_src], lr = args.lr)
     for step in range(start_iter, args.max_iter):
         iter_start_time = time.time()
@@ -96,7 +102,7 @@ def fit_voxel(voxels_src, voxels_tgt, args):
 
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()        
+        optimizer.step()
 
         total_time = time.time() - start_time
         iter_time = time.time() - iter_start_time
@@ -104,14 +110,14 @@ def fit_voxel(voxels_src, voxels_tgt, args):
         loss_vis = loss.cpu().item()
 
         print("[%4d/%4d]; ttime: %.0f (%.2f); loss: %.3f" % (step, args.max_iter, total_time,  iter_time, loss_vis))
-    
+
     print('Done!')
 
 
 def train_model(args):
     r2n2_dataset = R2N2("train", dataset_location.SHAPENET_PATH, dataset_location.R2N2_PATH, dataset_location.SPLITS_PATH, return_voxels=True)
 
-    
+
     feed = r2n2_dataset[0]
 
 
@@ -131,6 +137,8 @@ def train_model(args):
         fit_voxel(voxels_src, voxels_tgt, args)
 
 
+
+
     elif args.type == "point":
         # initialization
         pointclouds_src = torch.randn([1,args.n_points,3],requires_grad=True, device=args.device)
@@ -138,20 +146,20 @@ def train_model(args):
         pointclouds_tgt = sample_points_from_meshes(mesh_tgt, args.n_points)
 
         # fitting
-        fit_pointcloud(pointclouds_src, pointclouds_tgt, args)        
-    
+        fit_pointcloud(pointclouds_src, pointclouds_tgt, args)
+
     elif args.type == "mesh":
         # initialization
-        # try different ways of initializing the source mesh        
+        # try different ways of initializing the source mesh
         mesh_src = ico_sphere(4, args.device)
         mesh_tgt = Meshes(verts=[feed_cuda['verts']], faces=[feed_cuda['faces']])
 
         # fitting
-        fit_mesh(mesh_src, mesh_tgt, args)        
+        fit_mesh(mesh_src, mesh_tgt, args)
 
 
-    
-    
+
+
 
 
 if __name__ == '__main__':
