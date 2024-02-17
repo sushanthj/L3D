@@ -4,6 +4,7 @@ import time
 import dataset_location
 import losses
 import torch
+import wandb
 from model import SingleViewto3D
 from pytorch3d.datasets.r2n2.utils import collate_batched_R2N2
 from pytorch3d.ops import sample_points_from_meshes
@@ -26,7 +27,7 @@ def get_args_parser():
     parser.add_argument("--w_smooth", default=0.1, type=float)
     parser.add_argument("--save_freq", default=2000, type=int)
     parser.add_argument("--load_checkpoint", action="store_true")
-    parser.add_argument('--load_feat', action='store_true') 
+    parser.add_argument('--load_feat', action='store_true')
     return parser
 
 
@@ -65,6 +66,10 @@ def calculate_loss(predictions, ground_truth, args):
 
 
 def train_model(args):
+
+    # from google.colab import drive
+    # drive.mount('/content/drive')
+
     r2n2_dataset = R2N2(
         "train",
         dataset_location.SHAPENET_PATH,
@@ -88,6 +93,34 @@ def train_model(args):
     model = SingleViewto3D(args)
     model.to(args.device)
     model.train()
+
+    checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_1.pth'
+    wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
+
+    config = {
+        "arch": args.arch,
+        "lr": args.lr,
+        "max_iter": args.max_iter,
+        "batch_size": args.batch_size,
+        "num_workers": args.num_workers,
+        "type": args.type,
+        "n_points": args.n_points,
+        "w_chamfer": args.w_chamfer,
+        "w_smooth": args.w_smooth,
+        "save_freq": args.save_freq,
+        "load_checkpoint": args.load_checkpoint,
+        "load_feat": args.load_feat,
+    }
+
+    # Create your wandb run
+    run = wandb.init(
+        name    = "Voxel Trial 1", ### Wandb creates random run names if you skip this field, we recommend you give useful names
+        reinit  = True, ### Allows reinitalizing runs when you re-run this cell
+        #id     =
+        #resume =
+        project = "L3D Assignment_1", ### Project should be created in your wandb account
+        config  = config ### Wandb Config for your run
+    )
 
     # ============ preparing optimizer ... ============
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)  # to use with ViTs
@@ -138,6 +171,16 @@ def train_model(args):
                 },
                 f"checkpoint_{args.type}.pth",
             )
+            checkpoint = {'step': step,
+              'model_state_dict': model.state_dict(),
+              'optimizer_state_dict': optimizer.state_dict(),
+              'Train loss': loss,
+              'model_state_dict' : model.state_dict(),
+              "optimizer_state_dict": optimizer.state_dict(),
+              }
+            torch.save(checkpoint, checkpoint_path)
+
+            wandb.log({'train_loss': loss, 'lr': args.lr})
 
         print(
             "[%4d/%4d]; ttime: %.0f (%.2f, %.2f); loss: %.3f"

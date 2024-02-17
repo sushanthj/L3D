@@ -6,6 +6,14 @@ import torch
 from pytorch3d.utils import ico_sphere
 import pytorch3d
 
+class View(nn.Module):
+        def __init__(self, shape):
+            super().__init__()
+            self.shape = shape
+
+        def forward(self, x):
+            return x.view(*self.shape)
+
 class SingleViewto3D(nn.Module):
     def __init__(self, args):
         super(SingleViewto3D, self).__init__()
@@ -15,28 +23,28 @@ class SingleViewto3D(nn.Module):
             self.encoder = torch.nn.Sequential(*(list(vision_model.children())[:-1]))
             self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
 
+# NOTE: For visualizing the voxels, make the voxel size proportional to the confidence of the output
+#       See Fig. 4 in Learning a Predictable and Generative Vector Representation for Objects
 
         # define decoder
         if args.type == "vox":
             # Input: b x 512
             # Output: b x 32 x 32 x 32
-            pass
-            # TODO:
-            # self.decoder =             
+            self.decoder = self.voxel_decoder()
         elif args.type == "point":
             # Input: b x 512
-            # Output: b x args.n_points x 3  
+            # Output: b x args.n_points x 3
             self.n_point = args.n_points
             # TODO:
-            # self.decoder =             
+            # self.decoder =
         elif args.type == "mesh":
             # Input: b x 512
-            # Output: b x mesh_pred.verts_packed().shape[0] x 3  
+            # Output: b x mesh_pred.verts_packed().shape[0] x 3
             # try different mesh initializations
             mesh_pred = ico_sphere(4, self.device)
             self.mesh_pred = pytorch3d.structures.Meshes(mesh_pred.verts_list()*args.batch_size, mesh_pred.faces_list()*args.batch_size)
             # TODO:
-            # self.decoder =             
+            # self.decoder =
 
     def forward(self, images, args):
         results = dict()
@@ -54,18 +62,37 @@ class SingleViewto3D(nn.Module):
 
         # call decoder
         if args.type == "vox":
-            # TODO:
-            # voxels_pred =             
+            voxels_pred = self.decoder(encoded_feat)
             return voxels_pred
 
         elif args.type == "point":
             # TODO:
-            # pointclouds_pred =             
-            return pointclouds_pred
+            # pointclouds_pred =
+            # return pointclouds_pred
+            pass
 
         elif args.type == "mesh":
             # TODO:
-            # deform_vertices_pred =             
-            mesh_pred = self.mesh_pred.offset_verts(deform_vertices_pred.reshape([-1,3]))
-            return  mesh_pred          
+            # deform_vertices_pred =
+            # mesh_pred = self.mesh_pred.offset_verts(deform_vertices_pred.reshape([-1,3]))
+            # return  mesh_pred
+            pass
 
+    def voxel_decoder(self):
+        """
+        Define the Decoder to generate voxels from the base latent vector (b x 512)
+
+        From Pix2View
+        """
+        decoder = nn.Sequential(
+            nn.Linear(512, 256*4*4*4),  # Map the input features to the volume of the voxel grid
+            View((-1, 256, 4, 4, 4)),  # Reshape the tensor to the right size
+            nn.ReLU(),
+            nn.ConvTranspose3d(256, 128, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            nn.ConvTranspose3d(64, 1, kernel_size=4, stride=2, padding=1),
+            nn.Sigmoid()  # Output probabilities between 0 and 1
+        )
+        return decoder

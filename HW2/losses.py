@@ -19,7 +19,7 @@ def voxel_loss(voxel_src,voxel_tgt):
 
 	Now, BCEWithLogitsLoss is a small modification where it internally does the sigmoid for us
 	"""
-	loss_func = torch.nn.BCEWithLogitsLoss()
+	loss_func = torch.nn.BCELoss()
 	loss = loss_func(voxel_src, voxel_tgt)
 	# implement some loss for binary voxel grids
 	return loss
