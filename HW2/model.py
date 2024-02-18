@@ -40,6 +40,7 @@ class SingleViewto3D(nn.Module):
             # Input: b x 512
             # Output: b x mesh_pred.verts_packed().shape[0] x 3
             # try different mesh initializations
+            # NOTE: for a ico_sphere the value of mesh_pred.verts_packed().shape[0] = 652
             mesh_pred = ico_sphere(4, self.device)
             self.mesh_pred = pytorch3d.structures.Meshes(mesh_pred.verts_list()*args.batch_size, mesh_pred.faces_list()*args.batch_size)
             self.mesh_decode = self.mesh_decoder()
@@ -86,6 +87,8 @@ class SingleViewto3D(nn.Module):
             nn.ReLU(),
             nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
+            # NOTE: the output of the last layer should be a 3D volume of size 32x32x32
+            # Here, we reduce the number of channels to 1 to get output shape = (b x 1 x 32 x 32 x 32)
             nn.ConvTranspose3d(64, 1, kernel_size=4, stride=2, padding=1),
             nn.Sigmoid()  # Output probabilities between 0 and 1
         )
