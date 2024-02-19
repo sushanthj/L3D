@@ -29,7 +29,7 @@ def get_args_parser():
     parser.add_argument("--load_checkpoint", action="store_true")
     parser.add_argument('--load_feat', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
-    parser.add_argument('--wandb_run_name', default='voxel_trial_1', type=str)
+    parser.add_argument('--wandb_run_name', default='voxel_trial_3', type=str)
     return parser
 
 
@@ -130,7 +130,8 @@ def train_model(args):
     start_time = time.time()
 
     if args.load_checkpoint:
-        checkpoint = torch.load(f"checkpoint_{args.type}.pth")
+        # checkpoint = torch.load(f"checkpoint_{args.type}.pth")
+        checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_iter = checkpoint["step"]
