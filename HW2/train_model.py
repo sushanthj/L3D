@@ -17,7 +17,7 @@ def get_args_parser():
     parser.add_argument("--arch", default="convnext_small", type=str)
     parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--max_iter", default=100000, type=int)
-    parser.add_argument("--batch_size", default=64, type=int)
+    parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
     parser.add_argument(
         "--type", default="vox", choices=["vox", "point", "mesh"], type=str
@@ -25,7 +25,7 @@ def get_args_parser():
     parser.add_argument("--n_points", default=1000, type=int)
     parser.add_argument("--w_chamfer", default=1.0, type=float)
     parser.add_argument("--w_smooth", default=0.1, type=float)
-    parser.add_argument("--save_freq", default=2000, type=int)
+    parser.add_argument("--save_freq", default=200, type=int)
     parser.add_argument("--load_checkpoint", action="store_true")
     parser.add_argument('--load_feat', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
@@ -94,7 +94,8 @@ def train_model(args):
     model.train()
 
     # checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_1.pth'
-    checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/pointcloud_1.pth'
+    # checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/pointcloud_1.pth'
+    checkpoint_path = f'/home/mrsd_teamh/sush/L3D/HW2/checkpoints/{args.type}_1.pth'
     wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
 
     config = {
@@ -124,6 +125,7 @@ def train_model(args):
 
     # ============ preparing optimizer ... ============
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)  # to use with ViTs
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100)
     start_iter = 0
     start_time = time.time()
 
@@ -133,6 +135,8 @@ def train_model(args):
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_iter = checkpoint["step"]
         print(f"Succesfully loaded iter {start_iter}")
+
+    min_loss = 1000000
 
     print("Starting training !")
     for step in range(start_iter, args.max_iter):
@@ -162,25 +166,29 @@ def train_model(args):
         loss_vis = loss.cpu().item()
 
         if (step % args.save_freq) == 0 and step > 0:
-            print(f"Saving checkpoint at step {step}")
-            torch.save(
-                {
-                    "step": step,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                },
-                f"checkpoint_{args.type}.pth",
-            )
-            checkpoint = {'step': step,
-              'model_state_dict': model.state_dict(),
-              'optimizer_state_dict': optimizer.state_dict(),
-              'Train loss': loss,
-              'model_state_dict' : model.state_dict(),
-              "optimizer_state_dict": optimizer.state_dict(),
-              }
-            torch.save(checkpoint, checkpoint_path)
+            if loss_vis < min_loss:
+                print(f"Saving checkpoint at step {step}")
+                torch.save(
+                    {
+                        "step": step,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                    },
+                    f"checkpoint_{args.type}.pth",
+                )
+                checkpoint = {'step': step,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'Train loss': loss,
+                'model_state_dict' : model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                }
+                torch.save(checkpoint, checkpoint_path)
 
             wandb.log({'train_loss': loss, 'lr': args.lr})
+
+        if step % 50 == 0:
+            scheduler.step(loss.item())
 
         print(
             "[%4d/%4d]; ttime: %.0f (%.2f, %.2f); loss: %.3f"
