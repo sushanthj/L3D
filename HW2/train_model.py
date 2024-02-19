@@ -116,7 +116,7 @@ def train_model(args):
 
     # Create your wandb run
     run = wandb.init(
-        name    = "Point Trial 1", ### Wandb creates random run names if you skip this field, we recommend you give useful names
+        name    = "Voxel Trial 2", ### Wandb creates random run names if you skip this field, we recommend you give useful names
         reinit  = True, ### Allows reinitalizing runs when you re-run this cell
         #id     =
         #resume =
