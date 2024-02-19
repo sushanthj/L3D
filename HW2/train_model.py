@@ -183,6 +183,7 @@ def train_model(args):
                 'Train loss': loss,
                 }
                 torch.save(checkpoint, checkpoint_path)
+                min_loss = loss_vis
 
             wandb.log({'train_loss': loss, 'lr': optimizer.param_groups[0]['lr']})
 
