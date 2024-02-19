@@ -89,7 +89,7 @@ def evaluate(predictions, mesh_gt, thresholds, args):
     if args.type == "vox":
         voxels_src = predictions
         H,W,D = voxels_src.shape[2:]
-        vertices_src, faces_src = mcubes.marching_cubes(voxels_src.detach().cpu().squeeze().numpy(), isovalue=0.5)
+        vertices_src, faces_src = mcubes.marching_cubes(voxels_src.detach().cpu().squeeze().numpy(), isovalue=0.3)
         # if vertices_src.shape == (0,3) and faces_src.shape == (0,3):
             # return
         vertices_src = torch.tensor(vertices_src).float()
@@ -127,8 +127,8 @@ def evaluate_model(args):
     start_iter = 0
     start_time = time.time()
 
-    # thresholds = [0.01, 0.02, 0.03, 0.04, 0.05]
-    thresholds = [0.06]
+    thresholds = [0.01, 0.02, 0.03, 0.04, 0.05]
+    # thresholds = [0.06]
 
     avg_f1_score_05 = []
     avg_f1_score = []
@@ -178,23 +178,23 @@ def evaluate_model(args):
         iter_time = time.time() - iter_start_time
 
         # metrics at threshold = 0.05
-        # f1_05 = metrics['F1@0.050000']
-        # avg_f1_score_05.append(f1_05)
-        # avg_p_score.append(torch.tensor([metrics["Precision@%f" % t] for t in thresholds]))
-        # avg_r_score.append(torch.tensor([metrics["Recall@%f" % t] for t in thresholds]))
-        # avg_f1_score.append(torch.tensor([metrics["F1@%f" % t] for t in thresholds]))
-
-        # print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@0.05: %.3f; Avg F1@0.05: %.3f" % (step, max_iter, total_time, read_time, iter_time, f1_05, torch.tensor(avg_f1_score_05).mean()))
-
-
-        # metrics at custom threshold
-        f1 = metrics[f'F1@{thresholds[-1]}0000']
-        avg_f1_score.append(f1)
+        f1_05 = metrics['F1@0.050000']
+        avg_f1_score_05.append(f1_05)
         avg_p_score.append(torch.tensor([metrics["Precision@%f" % t] for t in thresholds]))
         avg_r_score.append(torch.tensor([metrics["Recall@%f" % t] for t in thresholds]))
         avg_f1_score.append(torch.tensor([metrics["F1@%f" % t] for t in thresholds]))
 
-        print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@%.2f: %.3f; Avg F1@%.2f: %.3f" % (step, max_iter, total_time, read_time, iter_time, thresholds[-1], f1, thresholds[-1], torch.tensor(avg_f1_score).mean()))
+        print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@0.05: %.3f; Avg F1@0.05: %.3f" % (step, max_iter, total_time, read_time, iter_time, f1_05, torch.tensor(avg_f1_score_05).mean()))
+
+
+        # # metrics at custom threshold
+        # f1 = metrics[f'F1@{thresholds[-1]}0000']
+        # avg_f1_score.append(f1)
+        # avg_p_score.append(torch.tensor([metrics["Precision@%f" % t] for t in thresholds]))
+        # avg_r_score.append(torch.tensor([metrics["Recall@%f" % t] for t in thresholds]))
+        # avg_f1_score.append(torch.tensor([metrics["F1@%f" % t] for t in thresholds]))
+
+        # print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@%.2f: %.3f; Avg F1@%.2f: %.3f" % (step, max_iter, total_time, read_time, iter_time, thresholds[-1], f1, thresholds[-1], torch.tensor(avg_f1_score).mean()))
 
 
     avg_f1_score = torch.stack(avg_f1_score).mean(0)

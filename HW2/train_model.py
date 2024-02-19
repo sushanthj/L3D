@@ -185,7 +185,7 @@ def train_model(args):
                 torch.save(checkpoint, checkpoint_path)
                 min_loss = loss_vis
 
-            wandb.log({'train_loss': loss, 'lr': optimizer.param_groups[0]['lr']})
+            wandb.log({'train_loss': loss, 'lr': scheduler._last_lr[0]})
 
         if step % 50 == 0:
             scheduler.step(loss.item())
