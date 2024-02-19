@@ -181,8 +181,6 @@ def train_model(args):
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'Train loss': loss,
-                'model_state_dict' : model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
                 }
                 torch.save(checkpoint, checkpoint_path)
 
