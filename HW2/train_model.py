@@ -186,7 +186,7 @@ def train_model(args):
                 }
                 torch.save(checkpoint, checkpoint_path)
 
-            wandb.log({'train_loss': loss, 'lr': args.lr})
+            wandb.log({'train_loss': loss, 'lr': optimizer.param_groups[0]['lr']})
 
         if step % 50 == 0:
             scheduler.step(loss.item())
