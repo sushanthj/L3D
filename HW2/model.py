@@ -43,6 +43,7 @@ class SingleViewto3D(nn.Module):
             # NOTE: for a ico_sphere the value of mesh_pred.verts_packed().shape[0] = 652
             mesh_pred = ico_sphere(4, self.device)
             self.mesh_pred = pytorch3d.structures.Meshes(mesh_pred.verts_list()*args.batch_size, mesh_pred.faces_list()*args.batch_size)
+            print(" pre model shape ", self.mesh_pred.verts_packed().shape)
             self.mesh_decode = self.mesh_decoder()
 
     def forward(self, images, args):
@@ -70,7 +71,9 @@ class SingleViewto3D(nn.Module):
 
         elif args.type == "mesh":
             deform_vertices_pred = self.mesh_decode(encoded_feat)
-            mesh_pred = self.mesh_pred.offset_verts(deform_vertices_pred.reshape([-1,3]))
+            print("post model shape ", (deform_vertices_pred.reshape([-1,3])).shape)
+            print(" pre model shape ", self.mesh_pred.verts_packed().shape)
+            mesh_pred = self.mesh_pred.offset_verts(deform_vertices_pred.reshape([-1,3])) #! ASK: Are we collapsing all batches?
             return  mesh_pred
 
     def voxel_decoder(self):
@@ -80,16 +83,17 @@ class SingleViewto3D(nn.Module):
         From Pix2View
         """
         decoder = nn.Sequential(
-            nn.Linear(512, 256*4*4*4),  # Map the input features to the volume of the voxel grid
-            View((-1, 256, 4, 4, 4)),  # Reshape the tensor to the right size
-            nn.ReLU(),
-            nn.ConvTranspose3d(256, 128, kernel_size=4, stride=2, padding=1),
+            nn.Linear(512, 128*4*4*4),  # Map the input features to the volume of the voxel grid
+            View((-1, 128, 4, 4, 4)),  # Reshape the tensor to the right size
             nn.ReLU(),
             nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm3d(64),
+            nn.ReLU(),
+            nn.ConvTranspose3d(64, 32, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
             # NOTE: the output of the last layer should be a 3D volume of size 32x32x32
             # Here, we reduce the number of channels to 1 to get output shape = (b x 1 x 32 x 32 x 32)
-            nn.ConvTranspose3d(64, 1, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose3d(32, 1, kernel_size=4, stride=2, padding=1),
             nn.Sigmoid()  # Output probabilities between 0 and 1
         )
         return decoder
@@ -103,6 +107,7 @@ class SingleViewto3D(nn.Module):
             nn.Linear(512, 1024),  # Map the input features to the volume of the voxel grid
             nn.ReLU(),
             nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
             nn.ReLU(),
             nn.Linear(1024, self.n_point*3),
             # split the output into (b x n_point x 3)
@@ -118,9 +123,11 @@ class SingleViewto3D(nn.Module):
         decoder = nn.Sequential(
             nn.Linear(512, 1024),
             nn.ReLU(),
-            nn.Linear(1024, 1024),
+            nn.Linear(1024, 2048),
+            nn.BatchNorm1d(2048),
             nn.ReLU(),
-            nn.Linear(1024, self.mesh_pred.verts_packed().shape[0]*3),
+            nn.Linear(2048, self.mesh_pred.verts_packed().shape[0]*3),
+            # NOTE: self.mesh_pred.verts_packed().shape[0] includes the batch size
             # split the output into b x mesh_pred.verts_packed().shape[0] x 3
             View((-1, self.mesh_pred.verts_packed().shape[0], 3))
         )

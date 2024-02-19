@@ -10,7 +10,9 @@ from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.ops import knn_points
 import mcubes
 import utils_vox
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+from visualie_utils import *
+import torch.nn.functional as F
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Singleto3D', add_help=False)
@@ -19,12 +21,13 @@ def get_args_parser():
     parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--num_workers', default=0, type=int)
     parser.add_argument('--type', default='vox', choices=['vox', 'point', 'mesh'], type=str)
-    parser.add_argument('--n_points', default=5000, type=int)
+    parser.add_argument('--n_points', default=1000, type=int)
     parser.add_argument('--w_chamfer', default=1.0, type=float)
-    parser.add_argument('--w_smooth', default=0.1, type=float)  
-    parser.add_argument('--load_checkpoint', action='store_true')  
-    parser.add_argument('--device', default='cuda', type=str) 
-    parser.add_argument('--load_feat', action='store_true') 
+    parser.add_argument('--w_smooth', default=0.1, type=float)
+    parser.add_argument('--load_checkpoint', action='store_true')
+    parser.add_argument('--device', default='cuda', type=str)
+    parser.add_argument('--load_feat', action='store_true', default=True)
+    parser.add_argument('--checkpoint_path', default='./checkpoints/point.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
@@ -87,6 +90,8 @@ def evaluate(predictions, mesh_gt, thresholds, args):
         voxels_src = predictions
         H,W,D = voxels_src.shape[2:]
         vertices_src, faces_src = mcubes.marching_cubes(voxels_src.detach().cpu().squeeze().numpy(), isovalue=0.5)
+        # if vertices_src.shape == (0,3) and faces_src.shape == (0,3):
+            # return
         vertices_src = torch.tensor(vertices_src).float()
         faces_src = torch.tensor(faces_src.astype(int))
         mesh_src = pytorch3d.structures.Meshes([vertices_src], [faces_src])
@@ -98,12 +103,11 @@ def evaluate(predictions, mesh_gt, thresholds, args):
         pred_points = sample_points_from_meshes(predictions, args.n_points).cpu()
 
     gt_points = sample_points_from_meshes(mesh_gt, args.n_points)
-    
+
     metrics = compute_sampling_metrics(pred_points, gt_points, thresholds)
     return metrics
 
-
-
+@torch.inference_mode()
 def evaluate_model(args):
     r2n2_dataset = R2N2("test", dataset_location.SHAPENET_PATH, dataset_location.R2N2_PATH, dataset_location.SPLITS_PATH, return_voxels=True, return_feats=args.load_feat)
 
@@ -131,10 +135,10 @@ def evaluate_model(args):
     avg_r_score = []
 
     if args.load_checkpoint:
-        checkpoint = torch.load(f'checkpoint_{args.type}.pth')
+        checkpoint = torch.load(args.checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         print(f"Succesfully loaded iter {start_iter}")
-    
+
     print("Starting evaluating !")
     max_iter = len(eval_loader)
     for step in range(start_iter, max_iter):
@@ -155,12 +159,18 @@ def evaluate_model(args):
 
         metrics = evaluate(predictions, mesh_gt, thresholds, args)
 
-        # TODO:
-        # if (step % args.vis_freq) == 0:
-        #     # visualization block
-        #     #  rend = 
-        #     plt.imsave(f'vis/{step}_{args.type}.png', rend)
-      
+        if (step % args.vis_freq) == 0:
+            # visualization block
+            if args.type == "vox":
+                visualize_voxels(predictions[0], f'{step}_{args.type}')
+            elif args.type == "point":
+                visualize_pointcloud(predictions, f'{step}_{args.type}')
+            elif args.type == "mesh":
+                visualize_mesh(predictions, f'{step}_{args.type}')
+            else:
+                raise ValueError(f"Unknown type: {args.type}")
+            # plt.imsave(f'vis/{step}_{args.type}.png', rend)
+
 
         total_time = time.time() - start_time
         iter_time = time.time() - iter_start_time
@@ -172,12 +182,21 @@ def evaluate_model(args):
         avg_f1_score.append(torch.tensor([metrics["F1@%f" % t] for t in thresholds]))
 
         print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@0.05: %.3f; Avg F1@0.05: %.3f" % (step, max_iter, total_time, read_time, iter_time, f1_05, torch.tensor(avg_f1_score_05).mean()))
-    
+
 
     avg_f1_score = torch.stack(avg_f1_score).mean(0)
 
     save_plot(thresholds, avg_f1_score,  args)
     print('Done!')
+
+"""
+NOTE: TA comment on Piazza:
+'There is no exact number to hit. However, as a reference,
+- F1 score > 65 for voxels
+- F1 score > 90 for point cloud and mesh
+
+should be a good starting point to reach
+"""
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Singleto3D', parents=[get_args_parser()])

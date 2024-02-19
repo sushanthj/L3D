@@ -14,7 +14,7 @@ from r2n2_custom import R2N2
 def get_args_parser():
     parser = argparse.ArgumentParser("Singleto3D", add_help=False)
     # Model parameters
-    parser.add_argument("--arch", default="resnet18", type=str)
+    parser.add_argument("--arch", default="convnext_small", type=str)
     parser.add_argument("--lr", default=4e-4, type=float)
     parser.add_argument("--max_iter", default=100000, type=int)
     parser.add_argument("--batch_size", default=32, type=int)
@@ -95,7 +95,8 @@ def train_model(args):
     model.to(args.device)
     model.train()
 
-    checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_1.pth'
+    # checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_1.pth'
+    checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/pointcloud_1.pth'
     wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
 
     config = {
@@ -115,7 +116,7 @@ def train_model(args):
 
     # Create your wandb run
     run = wandb.init(
-        name    = "Voxel Trial 1", ### Wandb creates random run names if you skip this field, we recommend you give useful names
+        name    = "Point Trial 1", ### Wandb creates random run names if you skip this field, we recommend you give useful names
         reinit  = True, ### Allows reinitalizing runs when you re-run this cell
         #id     =
         #resume =

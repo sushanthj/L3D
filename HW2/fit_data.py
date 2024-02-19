@@ -9,10 +9,8 @@ from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.structures import Meshes
 import dataset_location
 import torch
-
-
-
-
+import torch.nn.functional as F
+from visualie_utils import *
 
 
 def get_args_parser():
@@ -27,6 +25,9 @@ def get_args_parser():
     return parser
 
 def fit_mesh(mesh_src, mesh_tgt, args):
+    with torch.no_grad():
+        visualize_mesh(mesh_src, "src_before_gradient_descent")
+
     start_iter = 0
     start_time = time.time()
 
@@ -59,12 +60,17 @@ def fit_mesh(mesh_src, mesh_tgt, args):
 
     mesh_src.offset_verts_(deform_vertices_src)
 
+    with torch.no_grad():
+        visualize_mesh(mesh_src, "src_after_gradient_descent")
+
     print('Done!')
 
 
 def fit_pointcloud(pointclouds_src, pointclouds_tgt, args):
-    # visualize pointcloud before gradient descent
-    # TODO
+    with torch.no_grad():
+        # visualize pointcloud before gradient descent
+        visualize_pointcloud(pointclouds_src, "src_before_gradient_descent")
+        visualize_pointcloud(pointclouds_tgt, "tgt_before_gradient_descent")
 
     start_iter = 0
     start_time = time.time()
@@ -87,18 +93,24 @@ def fit_pointcloud(pointclouds_src, pointclouds_tgt, args):
 
     print('Done!')
 
-    # visualize after gradient descent
-    # TODO
+    with torch.no_grad():
+        # visualize after gradient descent
+        visualize_pointcloud(pointclouds_src, "src_after_gradient_descent")
 
 
 def fit_voxel(voxels_src, voxels_tgt, args):
+    # visualize voxel as mesh before gradient descent
+    # NOTE: voxels_src is a tensor of shape b x 32 x 32 x 32
+    visualize_voxels(F.sigmoid(voxels_src), "src_before_gradient_descent")
+    visualize_voxels(voxels_tgt, "tgt_before_gradient_descent")
+
     start_iter = 0
     start_time = time.time()
     optimizer = torch.optim.Adam([voxels_src], lr = args.lr)
     for step in range(start_iter, args.max_iter):
         iter_start_time = time.time()
 
-        loss = losses.voxel_loss(voxels_src,voxels_tgt)
+        loss = losses.voxel_loss(F.sigmoid(voxels_src),voxels_tgt)
 
         optimizer.zero_grad()
         loss.backward()
@@ -113,6 +125,9 @@ def fit_voxel(voxels_src, voxels_tgt, args):
 
     print('Done!')
 
+    # visualize after gradient descent
+    visualize_voxels(F.sigmoid(voxels_src), "src_after_gradient_descent")
+
 
 def train_model(args):
     r2n2_dataset = R2N2("train", dataset_location.SHAPENET_PATH, dataset_location.R2N2_PATH, dataset_location.SPLITS_PATH, return_voxels=True)
@@ -126,7 +141,6 @@ def train_model(args):
         if torch.is_tensor(feed[k]):
             feed_cuda[k] = feed[k].to(args.device).float()
 
-
     if args.type == "vox":
         # initialization
         voxels_src = torch.rand(feed_cuda['voxels'].shape,requires_grad=True, device=args.device)
@@ -135,9 +149,6 @@ def train_model(args):
 
         # fitting
         fit_voxel(voxels_src, voxels_tgt, args)
-
-
-
 
     elif args.type == "point":
         # initialization
