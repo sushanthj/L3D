@@ -29,6 +29,7 @@ def get_args_parser():
     parser.add_argument("--load_checkpoint", action="store_true")
     parser.add_argument('--load_feat', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
+    parser.add_argument('--wandb_run_name', default='voxel_trial_1', type=str)
     return parser
 
 
@@ -67,9 +68,6 @@ def calculate_loss(predictions, ground_truth, args):
 
 
 def train_model(args):
-
-    # from google.colab import drive
-    # drive.mount('/content/drive')
 
     r2n2_dataset = R2N2(
         "train",
@@ -116,7 +114,7 @@ def train_model(args):
 
     # Create your wandb run
     run = wandb.init(
-        name    = "Voxel Trial 2", ### Wandb creates random run names if you skip this field, we recommend you give useful names
+        name    = args.wandb_run_name, ### Wandb creates random run names if you skip this field, we recommend you give useful names
         reinit  = True, ### Allows reinitalizing runs when you re-run this cell
         #id     =
         #resume =
