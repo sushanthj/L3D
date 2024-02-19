@@ -15,9 +15,9 @@ def get_args_parser():
     parser = argparse.ArgumentParser("Singleto3D", add_help=False)
     # Model parameters
     parser.add_argument("--arch", default="convnext_small", type=str)
-    parser.add_argument("--lr", default=4e-4, type=float)
+    parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--max_iter", default=100000, type=int)
-    parser.add_argument("--batch_size", default=32, type=int)
+    parser.add_argument("--batch_size", default=64, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
     parser.add_argument(
         "--type", default="vox", choices=["vox", "point", "mesh"], type=str
