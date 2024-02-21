@@ -27,7 +27,7 @@ def get_args_parser():
     parser.add_argument('--load_checkpoint', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--load_feat', action='store_true', default=True)
-    parser.add_argument('--checkpoint_path', default='./checkpoints/vox_1.pth', type=str)
+    parser.add_argument('--checkpoint_path', default='./checkpoints/point_1.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
@@ -128,7 +128,6 @@ def evaluate_model(args):
     start_time = time.time()
 
     thresholds = [0.01, 0.02, 0.03, 0.04, 0.05]
-    # thresholds = [0.06]
 
     avg_f1_score_05 = []
     avg_f1_score = []
