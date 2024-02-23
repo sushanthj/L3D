@@ -97,6 +97,9 @@ class SingleViewto3D(nn.Module):
             # NOTE: the output of the last layer should be a 3D volume of size 32x32x32
             # Here, we reduce the number of channels to 1 to get output shape = (b x 1 x 32 x 32 x 32)
             nn.ConvTranspose3d(256, 96, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.GELU(),
+            nn.ConvTranspose3d(96, 1, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.GELU(),
             nn.Sigmoid()  # Output probabilities between 0 and 1
         )
         return decoder

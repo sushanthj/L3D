@@ -29,7 +29,7 @@ def get_args_parser():
     parser.add_argument("--load_checkpoint", action="store_true")
     parser.add_argument('--load_feat', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
-    parser.add_argument('--wandb_run_name', default='voxel_trial_3', type=str)
+    parser.add_argument('--wandb_run_name', default='voxel_2', type=str)
     return parser
 
 
@@ -94,9 +94,9 @@ def train_model(args):
     model.to(args.device)
     model.train()
 
-    # checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_1.pth'
+    checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_2.pth'
     # checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/pointcloud_1.pth'
-    checkpoint_path = f'/home/mrsd_teamh/sush/L3D/HW2/checkpoints/{args.type}_1.pth'
+    # checkpoint_path = f'/home/mrsd_teamh/sush/L3D/HW2/checkpoints/{args.type}_1.pth'
     wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
 
     config = {
