@@ -83,10 +83,11 @@ class SingleViewto3D(nn.Module):
         From Pix2View
         """
         decoder = nn.Sequential(
-            nn.Linear(512, 128*4*4*4),  # Map the input features to the volume of the voxel grid
-            View((-1, 128, 4, 4, 4)),  # Reshape the tensor to the right size
+            nn.Linear(512,2048),  # Map the input features to the volume of the voxel grid
+            # View((-1, 256, 2, 2, 2)),  # Reshape the tensor to the right size
+            nn.Unflatten(1,(256,2,2,2)),
             nn.GELU(),
-            nn.ConvTranspose3d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.ConvTranspose3d(256, 256, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm3d(256),
             nn.GELU(),
             nn.ConvTranspose3d(256, 384, kernel_size=4, stride=2, padding=1, bias=False),
@@ -98,7 +99,7 @@ class SingleViewto3D(nn.Module):
             # Here, we reduce the number of channels to 1 to get output shape = (b x 1 x 32 x 32 x 32)
             nn.ConvTranspose3d(256, 96, kernel_size=4, stride=2, padding=1, bias=False),
             nn.GELU(),
-            nn.ConvTranspose3d(96, 1, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.ConvTranspose3d(96, 1, kernel_size=1, stride=1, padding=0, bias=False),
             nn.Sigmoid()  # Output probabilities between 0 and 1
         )
         return decoder
