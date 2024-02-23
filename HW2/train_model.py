@@ -97,7 +97,7 @@ def train_model(args):
     # checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_2.pth'
     # checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/voxel_1.pth'
     # checkpoint_path = f'/home/mrsd_teamh/sush/L3D/HW2/checkpoints/{args.type}_1.pth'
-    checkpoint_paht = f'/projects/academic/rohini/m44/git-prjs/3DVision/L3D/HW2/checkpoints/{args.type}_1.pth'
+    checkpoint_path = f'/projects/academic/rohini/m44/git-prjs/3DVision/L3D/HW2/checkpoints/{args.type}_1.pth'
     wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
 
     config = {
