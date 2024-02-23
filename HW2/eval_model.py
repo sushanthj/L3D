@@ -17,7 +17,7 @@ import torch.nn.functional as F
 def get_args_parser():
     parser = argparse.ArgumentParser('Singleto3D', add_help=False)
     parser.add_argument('--arch', default='convnext_small', type=str)
-    parser.add_argument('--vis_freq', default=1000, type=int)
+    parser.add_argument('--vis_freq', default=10, type=int)
     parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--num_workers', default=0, type=int)
     parser.add_argument('--type', default='vox', choices=['vox', 'point', 'mesh'], type=str)
@@ -27,7 +27,7 @@ def get_args_parser():
     parser.add_argument('--load_checkpoint', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--load_feat', action='store_true', default=True)
-    parser.add_argument('--checkpoint_path', default='./checkpoints/point_1.pth', type=str)
+    parser.add_argument('--checkpoint_path', default='./checkpoints/vox_1.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
@@ -184,17 +184,6 @@ def evaluate_model(args):
         avg_f1_score.append(torch.tensor([metrics["F1@%f" % t] for t in thresholds]))
 
         print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@0.05: %.3f; Avg F1@0.05: %.3f" % (step, max_iter, total_time, read_time, iter_time, f1_05, torch.tensor(avg_f1_score_05).mean()))
-
-
-        # # metrics at custom threshold
-        # f1 = metrics[f'F1@{thresholds[-1]}0000']
-        # avg_f1_score.append(f1)
-        # avg_p_score.append(torch.tensor([metrics["Precision@%f" % t] for t in thresholds]))
-        # avg_r_score.append(torch.tensor([metrics["Recall@%f" % t] for t in thresholds]))
-        # avg_f1_score.append(torch.tensor([metrics["F1@%f" % t] for t in thresholds]))
-
-        # print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); F1@%.2f: %.3f; Avg F1@%.2f: %.3f" % (step, max_iter, total_time, read_time, iter_time, thresholds[-1], f1, thresholds[-1], torch.tensor(avg_f1_score).mean()))
-
 
     avg_f1_score = torch.stack(avg_f1_score).mean(0)
 

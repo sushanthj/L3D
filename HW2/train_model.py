@@ -24,7 +24,7 @@ def get_args_parser():
     )
     parser.add_argument("--n_points", default=1000, type=int)
     parser.add_argument("--w_chamfer", default=1.0, type=float)
-    parser.add_argument("--w_smooth", default=0.1, type=float)
+    parser.add_argument("--w_smooth", default=1.2, type=float)
     parser.add_argument("--save_freq", default=200, type=int)
     parser.add_argument("--load_checkpoint", action="store_true")
     parser.add_argument('--load_feat', action='store_true')
