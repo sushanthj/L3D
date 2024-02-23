@@ -99,7 +99,6 @@ class SingleViewto3D(nn.Module):
             nn.ConvTranspose3d(256, 96, kernel_size=4, stride=2, padding=1, bias=False),
             nn.GELU(),
             nn.ConvTranspose3d(96, 1, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.GELU(),
             nn.Sigmoid()  # Output probabilities between 0 and 1
         )
         return decoder
