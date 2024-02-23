@@ -14,9 +14,9 @@ from r2n2_custom import R2N2
 def get_args_parser():
     parser = argparse.ArgumentParser("Singleto3D", add_help=False)
     # Model parameters
-    parser.add_argument("--arch", default="convnext_small", type=str)
+    parser.add_argument("--arch", default="resnet18", type=str)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--max_iter", default=100000, type=int)
+    parser.add_argument("--max_iter", default=20000, type=int)
     parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
     parser.add_argument(
@@ -94,9 +94,10 @@ def train_model(args):
     model.to(args.device)
     model.train()
 
-    checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_2.pth'
-    # checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/pointcloud_1.pth'
+    # checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_2.pth'
+    # checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/voxel_1.pth'
     # checkpoint_path = f'/home/mrsd_teamh/sush/L3D/HW2/checkpoints/{args.type}_1.pth'
+    checkpoint_paht = f'/projects/academic/rohini/m44/git-prjs/3DVision/L3D/HW2/checkpoints/{args.type}_1.pth'
     wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
 
     config = {
@@ -126,7 +127,8 @@ def train_model(args):
 
     # ============ preparing optimizer ... ============
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)  # to use with ViTs
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2000, 3000, 3500, 4000, 5000, 7000], gamma=0.8)
     start_iter = 0
     start_time = time.time()
 
@@ -188,8 +190,8 @@ def train_model(args):
 
             wandb.log({'train_loss': loss, 'lr': scheduler._last_lr[0]})
 
-        if step % 50 == 0:
-            scheduler.step(loss.item())
+        # drop learning rate at 7000'th iteration
+        scheduler.step()
 
         print(
             "[%4d/%4d]; ttime: %.0f (%.2f, %.2f); loss: %.3f"

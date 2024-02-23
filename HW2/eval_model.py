@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Singleto3D', add_help=False)
-    parser.add_argument('--arch', default='convnext_small', type=str)
+    parser.add_argument('--arch', default='resnet18', type=str)
     parser.add_argument('--vis_freq', default=10, type=int)
     parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--num_workers', default=0, type=int)
@@ -27,7 +27,7 @@ def get_args_parser():
     parser.add_argument('--load_checkpoint', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--load_feat', action='store_true', default=True)
-    parser.add_argument('--checkpoint_path', default='./checkpoints/vox_1.pth', type=str)
+    parser.add_argument('--checkpoint_path', default='./checkpoints/voxel_2.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
