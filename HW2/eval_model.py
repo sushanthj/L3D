@@ -26,8 +26,8 @@ def get_args_parser():
     parser.add_argument('--w_smooth', default=0.1, type=float)
     parser.add_argument('--load_checkpoint', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
-    parser.add_argument('--load_feat', action='store_true', default=True)
-    parser.add_argument('--checkpoint_path', default='./checkpoints/voxel_2.pth', type=str)
+    parser.add_argument('--load_feat', action='store_true')
+    parser.add_argument('--checkpoint_path', default='./checkpoints/vox_2.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
@@ -89,7 +89,7 @@ def evaluate(predictions, mesh_gt, thresholds, args):
     if args.type == "vox":
         voxels_src = predictions
         H,W,D = voxels_src.shape[2:]
-        vertices_src, faces_src = mcubes.marching_cubes(voxels_src.detach().cpu().squeeze().numpy(), isovalue=0.3)
+        vertices_src, faces_src = mcubes.marching_cubes(voxels_src.detach().cpu().squeeze().numpy(), isovalue=0.5)
         # if vertices_src.shape == (0,3) and faces_src.shape == (0,3):
             # return
         vertices_src = torch.tensor(vertices_src).float()
@@ -109,7 +109,13 @@ def evaluate(predictions, mesh_gt, thresholds, args):
 
 @torch.inference_mode()
 def evaluate_model(args):
-    r2n2_dataset = R2N2("test", dataset_location.SHAPENET_PATH, dataset_location.R2N2_PATH, dataset_location.SPLITS_PATH, return_voxels=True, return_feats=args.load_feat)
+    r2n2_dataset = R2N2("test",
+                        dataset_location.SHAPENET_PATH,
+                        dataset_location.R2N2_PATH,
+                        dataset_location.SPLITS_PATH,
+                        return_voxels=True,
+                        return_feats=args.load_feat,)
+                        # use_cache=True,)
 
     loader = torch.utils.data.DataLoader(
         r2n2_dataset,
@@ -141,6 +147,7 @@ def evaluate_model(args):
 
     print("Starting evaluating !")
     max_iter = len(eval_loader)
+    skipped = 0
     for step in range(start_iter, max_iter):
         iter_start_time = time.time()
 
@@ -161,9 +168,14 @@ def evaluate_model(args):
 
         if (step % args.vis_freq) == 0:
             # visualization block
+            visualize_mesh(mesh_gt, f'{step}_gt')
+
             if args.type == "vox":
-                visualize_voxels(predictions[0], f'{step}_{args.type}')
-                pass
+                try:
+                    visualize_voxels_as_mesh(predictions, f'{step}_{args.type}')
+                except:
+                    print("decrease ISO")
+                    skipped += 1
             elif args.type == "point":
                 visualize_pointcloud(predictions, f'{step}_{args.type}')
             elif args.type == "mesh":
@@ -189,6 +201,7 @@ def evaluate_model(args):
 
     save_plot(thresholds, avg_f1_score,  args)
     print('Done!')
+    print("skipped", skipped)
 
 """
 NOTE: TA comment on Piazza:

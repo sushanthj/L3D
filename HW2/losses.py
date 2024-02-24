@@ -1,6 +1,6 @@
 import torch
 from pytorch3d.ops import knn_points, knn_gather
-from pytorch3d.loss import mesh_laplacian_smoothing
+from pytorch3d.loss import mesh_laplacian_smoothing, chamfer_distance
 
 # define losses
 def voxel_loss(voxel_src,voxel_tgt):
@@ -36,18 +36,19 @@ def chamfer_loss(point_cloud_src, point_cloud_tgt):
 	# forward_gather = knn_gather(point_cloud_tgt, forward_result.idx, forward_result.shape[-1])
 
 	# For numerical stability in sq root
-	eps = 1e-8
+	# eps = 1e-8
 
-	knn_result = knn_points(point_cloud_src, point_cloud_tgt, K=1) # output shape = b x n_points x 1
-	loss_part_1 = (torch.sqrt(knn_result.dists + eps)).mean()
+	# knn_result = knn_points(point_cloud_src, point_cloud_tgt, K=1) # output shape = b x n_points x 1
+	# loss_part_1 = (torch.sqrt(knn_result.dists + eps)).mean()
 
-	# Repeat for backward
-	knn_result = knn_points(point_cloud_tgt, point_cloud_src, K=1) # output shape = b x n_points x 1
-	loss_part_2 = (torch.sqrt(knn_result.dists + eps)).mean()
+	# # Repeat for backward
+	# knn_result = knn_points(point_cloud_tgt, point_cloud_src, K=1) # output shape = b x n_points x 1
+	# loss_part_2 = (torch.sqrt(knn_result.dists + eps)).mean()
 
-	loss_chamfer = loss_part_1 + loss_part_2
-	return loss_chamfer
+	# return (loss_part_1 + loss_part_2)
 
+	loss, _ = chamfer_distance(point_cloud_src, point_cloud_tgt)
+	return loss
 
 def smoothness_loss(mesh_src):
 	loss_laplacian = mesh_laplacian_smoothing(mesh_src)

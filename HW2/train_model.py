@@ -8,14 +8,14 @@ import wandb
 from model import SingleViewto3D
 from pytorch3d.datasets.r2n2.utils import collate_batched_R2N2
 from pytorch3d.ops import sample_points_from_meshes
-from r2n2_custom import R2N2
+from r2n2_custom_fast import R2N2
 
 
 def get_args_parser():
     parser = argparse.ArgumentParser("Singleto3D", add_help=False)
     # Model parameters
     parser.add_argument("--arch", default="resnet18", type=str)
-    parser.add_argument("--lr", default=1e-3, type=float)
+    parser.add_argument("--lr", default=5e-4, type=float)
     parser.add_argument("--max_iter", default=20000, type=int)
     parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
@@ -25,7 +25,7 @@ def get_args_parser():
     parser.add_argument("--n_points", default=1000, type=int)
     parser.add_argument("--w_chamfer", default=1.0, type=float)
     parser.add_argument("--w_smooth", default=1.2, type=float)
-    parser.add_argument("--save_freq", default=200, type=int)
+    parser.add_argument("--save_freq", default=500, type=int)
     parser.add_argument("--load_checkpoint", default=False)
     parser.add_argument('--load_feat', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
@@ -97,7 +97,7 @@ def train_model(args):
     # checkpoint_path = '/content/drive/MyDrive/Colab Notebooks/L3D/Assignment_1/checkpoints/voxel_2.pth'
     # checkpoint_path = '/home/sush/CMU/l3d/L3D/HW2/checkpoints/voxel_1.pth'
     # checkpoint_path = f'/home/mrsd_teamh/sush/L3D/HW2/checkpoints/{args.type}_1.pth'
-    checkpoint_path = f'/projects/academic/rohini/m44/git-prjs/3DVision/L3D/HW2/checkpoints/{args.type}_1.pth'
+    checkpoint_path = f'/projects/academic/rohini/m44/git-prjs/3DVision/L3D/HW2/checkpoint_{args.type}.pth'
     wandb.login(key="49efd84d0e342f343fb91401332234dea4a3ffe2")
 
     config = {
@@ -128,7 +128,7 @@ def train_model(args):
     # ============ preparing optimizer ... ============
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)  # to use with ViTs
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2000, 3000, 3500, 4000, 5000, 7000], gamma=0.8)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2000, 4000, 6000, 8000, 9000, 10000, 14000, 16000, 22000], gamma=0.8)
     start_iter = 0
     start_time = time.time()
 
@@ -136,8 +136,8 @@ def train_model(args):
         # checkpoint = torch.load(f"checkpoint_{args.type}.pth")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_iter = checkpoint["step"]
+        # optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # start_iter = checkpoint["step"]
         print(f"Succesfully loaded iter {start_iter}")
 
     min_loss = 1000000
@@ -159,6 +159,9 @@ def train_model(args):
         prediction_3d = model(images_gt, args)
 
         loss = calculate_loss(prediction_3d, ground_truth_3d, args)
+
+        if args.type == "vox":
+            loss *= 10
 
         optimizer.zero_grad()
         loss.backward()
@@ -185,12 +188,14 @@ def train_model(args):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'Train loss': loss,
                 }
+                checkpoint_path = checkpoint_path = f'/projects/academic/rohini/m44/git-prjs/3DVision/L3D/HW2/checkpoints/{args.type}_{step}.pth'
                 torch.save(checkpoint, checkpoint_path)
                 min_loss = loss_vis
 
             wandb.log({'train_loss': loss, 'lr': scheduler._last_lr[0]})
 
-        # drop learning rate at 7000'th iteration
+        # step is not the same as epoch, call scheduler only at the end of each epoch
+        # if step % len(train_loader) == 0:
         scheduler.step()
 
         print(

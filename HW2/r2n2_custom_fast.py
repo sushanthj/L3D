@@ -10,6 +10,7 @@ from os import path
 from pathlib import Path
 from typing import Dict, List, Optional
 import random
+import pickle
 
 
 import numpy as np
@@ -68,6 +69,8 @@ class R2N2(ShapeNetBase):  # pragma: no cover
         voxels_rel_path: str = "ShapeNetVoxels",
         load_textures: bool = False,
         texture_resolution: int = 4,
+        device: str = "cuda",
+        use_cache: bool = False
     ) -> None:
         """
         Store each object's synset id and models id the given directories.
@@ -103,6 +106,11 @@ class R2N2(ShapeNetBase):  # pragma: no cover
         self.load_textures = load_textures
         self.texture_resolution = texture_resolution
         self.return_feats = return_feats
+        self.device=device
+        self.use_cache=use_cache
+
+        self.mesh_cache = {}
+
         # Examine if split is valid.
         if split not in ["train", "val", "test"]:
             raise ValueError("split has to be one of (train, val, test).")
@@ -205,6 +213,12 @@ class R2N2(ShapeNetBase):  # pragma: no cover
                 "official mapping but not found in the dataset location %s: %s"
             ) % (shapenet_dir, ", ".join(synset_not_present))
             warnings.warn(msg)
+        
+        if self.use_cache:
+            # load pickle files for mesh and voxels
+            print("Using cached mesh data...")
+            with open('train_mesh.pickle', 'rb') as f:
+                self.mesh_cache = pickle.load(f)
 
     def __getitem__(self, model_idx, view_idxs: Optional[List[int]] = None) -> Dict:
         """
@@ -262,7 +276,11 @@ class R2N2(ShapeNetBase):  # pragma: no cover
             self.shapenet_dir, model["synset_id"], model["model_id"], "model.obj"
         )
         try:
-            verts, faces, textures = self._load_mesh(model_path)
+            if model_path in self.mesh_cache.keys():
+                verts, faces, textures = self.mesh_cache[model_path]
+            else:
+                verts, faces, textures = self._load_mesh(model_path)
+                self.mesh_cache[model_path] = [verts, faces, textures]
         except Exception:
             raise FileNotFoundError(
                 f"model_path {model_path} not found in {self.shapenet_dir}"
@@ -283,47 +301,53 @@ class R2N2(ShapeNetBase):  # pragma: no cover
                 model["model_id"],
                 "rendering",
             )
-            all_feats = torch.from_numpy(np.load(path.join(rendering_path, "feats.npy")))
+            # all_feats = torch.from_numpy(np.load(path.join(rendering_path, "feats.npy")))
             # Read metadata file to obtain params for calibration matrices.
-            with open(path.join(rendering_path, "rendering_metadata.txt"), "r") as f:
-                metadata_lines = f.readlines()
-            for i in model_views:
-                # Read image.
-                image_path = path.join(rendering_path, "%02d.png" % i)
-                raw_img = Image.open(image_path)
-                image = torch.from_numpy(np.array(raw_img) / 255.0)[..., :3]
-                images.append(image.to(dtype=torch.float32))
-                feats.append(all_feats[i].to(dtype=torch.float32))
+            # with open(path.join(rendering_path, "rendering_metadata.txt"), "r") as f:
+            #     metadata_lines = f.readlines()
+            num_views = len(model_views)
+            rand_view = random.randint(0,num_views-1)
+            image_path = path.join(rendering_path, "%02d.png" % rand_view)
+            raw_img = Image.open(image_path)
+            images = [torch.from_numpy(np.array(raw_img) / 255.0)[..., :3].to(dtype=torch.float32)]
 
-                # Get camera calibration.
-                azim, elev, yaw, dist_ratio, fov = [
-                    float(v) for v in metadata_lines[i].strip().split(" ")
-                ]
-                dist = dist_ratio * MAX_CAMERA_DISTANCE
-                # Extrinsic matrix before transformation to PyTorch3D world space.
-                RT = compute_extrinsic_matrix(azim, elev, dist)
-                R, T = self._compute_camera_calibration(RT)
-                Rs.append(R)
-                Ts.append(T)
-                voxel_RTs.append(RT)
+            # for i in model_views:
+            #     # Read image.
+            #     image_path = path.join(rendering_path, "%02d.png" % i)
+            #     raw_img = Image.open(image_path)
+            #     image = torch.from_numpy(np.array(raw_img) / 255.0)[..., :3]
+            #     images.append(image.to(dtype=torch.float32))
+            #     feats.append(all_feats[i].to(dtype=torch.float32))
+
+            #     # Get camera calibration.
+            #     azim, elev, yaw, dist_ratio, fov = [
+            #         float(v) for v in metadata_lines[i].strip().split(" ")
+            #     ]
+            #     dist = dist_ratio * MAX_CAMERA_DISTANCE
+            #     # Extrinsic matrix before transformation to PyTorch3D world space.
+            #     RT = compute_extrinsic_matrix(azim, elev, dist)
+            #     R, T = self._compute_camera_calibration(RT)
+            #     Rs.append(R)
+            #     Ts.append(T)
+            #     voxel_RTs.append(RT)
 
             # Intrinsic matrix extracted from the Blender with slight modification to work with
             # PyTorch3D world space. Taken from meshrcnn codebase:
             # https://github.com/facebookresearch/meshrcnn/blob/main/shapenet/utils/coords.py
-            K = torch.tensor(
-                [
-                    [2.1875, 0.0, 0.0, 0.0],
-                    [0.0, 2.1875, 0.0, 0.0],
-                    [0.0, 0.0, -1.002002, -0.2002002],
-                    [0.0, 0.0, 1.0, 0.0],
-                ]
-            )
-            model["images"] = torch.stack(images)
-            model["R"] = torch.stack(Rs)
-            model["T"] = torch.stack(Ts)
-            model["K"] = K.expand(len(model_views), 4, 4)
-            if self.return_feats:
-                model["feats"] = torch.stack(feats)
+            # K = torch.tensor(
+            #     [
+            #         [2.1875, 0.0, 0.0, 0.0],
+            #         [0.0, 2.1875, 0.0, 0.0],
+            #         [0.0, 0.0, -1.002002, -0.2002002],
+            #         [0.0, 0.0, 1.0, 0.0],
+            #     ]
+            # )
+            model["images"] = torch.stack(images)[0]
+            # model["R"] = torch.stack(Rs)
+            # model["T"] = torch.stack(Ts)
+            # model["K"] = K.expand(len(model_views), 4, 4)
+            # if self.return_feats:
+            #     model["feats"] = torch.stack(feats).to(self.device)
 
         voxels_list = []
 
@@ -354,17 +378,16 @@ class R2N2(ShapeNetBase):  # pragma: no cover
             #     voxels = voxelize(voxel_coords, P, VOXEL_SIZE)
             #     voxels_list.append(voxels)
             model["voxels"] = voxels
-        num_views = model['images'].shape[0]
-        rand_view = random.randint(0,num_views-1)
+        # num_views = model['images'].shape[0]
+        # rand_view = random.randint(0,num_views-1)
 
-        model['images'] = model['images'][rand_view]
-        model['R'] = model['R'][rand_view]
-        model['T'] = model['T'][rand_view]
-        model['K'] = model['K'][rand_view]
-        if self.return_feats:
-            model["feats"] = model["feats"][rand_view]
+        # model['images'] = model['images'][rand_view]
+        # model['R'] = model['R'][rand_view]
+        # model['T'] = model['T'][rand_view]
+        # model['K'] = model['K'][rand_view]
+        # if self.return_feats:
+        #     model["feats"] = model["feats"][rand_view]
 
-        
         return model
 
     def _compute_camera_calibration(self, RT):
@@ -395,6 +418,13 @@ class R2N2(ShapeNetBase):  # pragma: no cover
         R = RT[:3, :3]
         T = RT[3, :3]
         return R, T
+    
+    def _save_mesh_pickle(self):
+        print(len(self.mesh_cache.keys()))
+        print("saving to file train_mesh.pickle")
+        with open('train_mesh.pickle', 'wb') as f:
+            pickle.dump(self.mesh_cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print("Done.")
 
     def render(
         self,

@@ -72,8 +72,8 @@ class SingleViewto3D(nn.Module):
 
         elif args.type == "mesh":
             deform_vertices_pred = self.mesh_decode(encoded_feat)
-            print("post model shape ", (deform_vertices_pred.reshape([-1,3])).shape)
-            print(" pre model shape ", self.mesh_pred.verts_packed().shape)
+            # print("post model shape ", (deform_vertices_pred.reshape([-1,3])).shape)
+            # print(" pre model shape ", self.mesh_pred.verts_packed().shape)
             mesh_pred = self.mesh_pred.offset_verts(deform_vertices_pred.reshape([-1,3])) #! ASK: Are we collapsing all batches?
             return  mesh_pred
 
