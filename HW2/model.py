@@ -42,6 +42,7 @@ class SingleViewto3D(nn.Module):
             # try different mesh initializations
             # NOTE: for a ico_sphere the value of mesh_pred.verts_packed().shape[0] = 652
             mesh_pred = ico_sphere(4, self.device)
+            self.n_verts = mesh_pred.verts_packed().shape[0]
             self.mesh_pred = pytorch3d.structures.Meshes(mesh_pred.verts_list()*args.batch_size, mesh_pred.faces_list()*args.batch_size)
             print(" pre model shape ", self.mesh_pred.verts_packed().shape)
             self.mesh_decode = self.mesh_decoder()
@@ -128,13 +129,14 @@ class SingleViewto3D(nn.Module):
         """
         decoder = nn.Sequential(
             nn.Linear(512, 1024),
-            nn.ReLU(),
+            nn.BatchNorm1d(1024),
+            nn.GELU(),
             nn.Linear(1024, 2048),
-            nn.BatchNorm1d(2048),
-            nn.ReLU(),
-            nn.Linear(2048, self.mesh_pred.verts_packed().shape[0]*3),
+            nn.GELU(),
+            nn.Linear(2048, self.n_verts*3),
+            nn.Tanh() # we want -1 to 1 output
             # NOTE: self.mesh_pred.verts_packed().shape[0] includes the batch size
             # split the output into b x mesh_pred.verts_packed().shape[0] x 3
-            View((-1, self.mesh_pred.verts_packed().shape[0], 3))
+            # View((-1, self.mesh_pred.verts_packed().shape[0], 3))
         )
         return decoder
