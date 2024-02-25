@@ -47,7 +47,7 @@ class SingleViewto3D(nn.Module):
             print(" pre model shape ", self.mesh_pred.verts_packed().shape)
             self.mesh_decode = self.mesh_decoder()
 
-    def forward(self, images, args):
+    def forward(self, images, args, intermediate_output=None):
         results = dict()
 
         total_loss = 0.0
@@ -71,11 +71,14 @@ class SingleViewto3D(nn.Module):
             return pointclouds_pred
 
         elif args.type == "mesh":
+            n_verts = self.n_verts
+            self.mesh_decode = MeshDecoder(n_verts, intermediate_output)
             deform_vertices_pred = self.mesh_decode(encoded_feat)
             # print("post model shape ", (deform_vertices_pred.reshape([-1,3])).shape)
             # print(" pre model shape ", self.mesh_pred.verts_packed().shape)
             mesh_pred = self.mesh_pred.offset_verts(deform_vertices_pred.reshape([-1,3])) #! ASK: Are we collapsing all batches?
             return  mesh_pred
+
 
     def voxel_decoder(self):
         """
@@ -87,19 +90,21 @@ class SingleViewto3D(nn.Module):
             nn.Linear(512,2048),  # Map the input features to the volume of the voxel grid
             # View((-1, 256, 2, 2, 2)),  # Reshape the tensor to the right size
             nn.Unflatten(1,(256,2,2,2)),
-            nn.GELU(),
+            nn.ReLU(),
             nn.ConvTranspose3d(256, 256, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm3d(256),
-            nn.GELU(),
+            # nn.BatchNorm3d(256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
             nn.ConvTranspose3d(256, 384, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm3d(384),
-            nn.GELU(),
+            # nn.BatchNorm3d(384),
+            nn.ReLU(),
             nn.ConvTranspose3d(384, 256, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.GELU(),
+            nn.ReLU(),
+            nn.Dropout(0.2),
             # NOTE: the output of the last layer should be a 3D volume of size 32x32x32
             # Here, we reduce the number of channels to 1 to get output shape = (b x 1 x 32 x 32 x 32)
             nn.ConvTranspose3d(256, 96, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.GELU(),
+            nn.ReLU(),
             nn.ConvTranspose3d(96, 1, kernel_size=1, stride=1, padding=0, bias=False),
             nn.Sigmoid()  # Output probabilities between 0 and 1
         )
@@ -112,10 +117,10 @@ class SingleViewto3D(nn.Module):
         """
         decoder = nn.Sequential(
             nn.Linear(512, 1024),  # Map the input features to the volume of the voxel grid
-            nn.GELU(),
+            nn.ReLU(),
+            nn.Dropout(0.2),
             nn.Linear(1024, 1024),
-            nn.BatchNorm1d(1024),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Linear(1024, self.n_point*3),
             # split the output into (b x n_point x 3)
             View((-1, self.n_point, 3))
@@ -123,31 +128,27 @@ class SingleViewto3D(nn.Module):
         return decoder
 
 
-    def mesh_decoder(self):
-        """
-        Define the Decoder to generate meshes from the base latent vector (b x 512)
-        """
-        decoder = nn.Sequential(
-            nn.Linear(512, 1024),
-            nn.BatchNorm1d(1024),
-            nn.GELU(),
-            nn.Linear(1024, 2048),
-            nn.GELU(),
-            nn.Linear(2048, self.n_verts*3),
-            nn.Tanh() # we want -1 to 1 output
-            # NOTE: self.mesh_pred.verts_packed().shape[0] includes the batch size
-            # split the output into b x mesh_pred.verts_packed().shape[0] x 3
-            # View((-1, self.mesh_pred.verts_packed().shape[0], 3))
-        )
-        # decoder = nn.Sequential(
-        #     nn.Linear(512, 2048),
-        #     nn.GELU(),
-        #     nn.Linear(2048, 2048),
-        #     nn.GELU(),
-        #     nn.Linear(2048, self.n_verts*3),
-        #     nn.Tanh() # we want -1 to 1 output
-        #     # NOTE: self.mesh_pred.verts_packed().shape[0] includes the batch size
-        #     # split the output into b x mesh_pred.verts_packed().shape[0] x 3
-        #     # View((-1, self.mesh_pred.verts_packed().shape[0], 3))
-        # )
-        return decoder
+class MeshDecoder(nn.Module):
+    def __init__(self, n_verts):
+        super().__init__()
+        self.n_verts = n_verts
+        self.linear1 = nn.Linear(512, 2048)
+        self.gelu1 = nn.GELU()
+        self.drop1 = nn.Dropout(0.2)
+        self.linear2 = nn.Linear(2048, 2048)
+        self.gelu2 = nn.GELU()
+        self.linear3 = nn.Linear(2048, self.n_verts*3)
+        self.tanh = nn.Tanh()
+
+    def forward(self, x, intermediate_output=None):
+        if intermediate_output is None:
+            x = self.linear1(x)
+        else:
+            x = intermediate_output
+        x = self.gelu1(x)
+        x = self.drop1(x)
+        x = self.linear2(x)
+        x = self.gelu2(x)
+        x = self.linear3(x)
+        x = self.tanh(x)
+        return x

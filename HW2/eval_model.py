@@ -27,7 +27,7 @@ def get_args_parser():
     parser.add_argument('--load_checkpoint', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--load_feat', action='store_true')
-    parser.add_argument('--checkpoint_path', default='./checkpoints/mesh_2.pth', type=str)
+    parser.add_argument('--checkpoint_path', default='./checkpoints/point_v3_n1000.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
@@ -156,7 +156,7 @@ def evaluate_model(args):
     max_iter = len(eval_loader)
     skipped = 0
 
-    handle = model.mesh_decode[0].register_forward_hook(hook)
+    # handle = model.mesh_decode[0].register_forward_hook(hook)
 
     for step in range(start_iter, max_iter):
         iter_start_time = time.time()
@@ -191,9 +191,12 @@ def evaluate_model(args):
             elif args.type == "mesh":
                 visualize_mesh(predictions, f'{step}_{args.type}')
                 # interpolate the best looking objects
-                if (step % 220 == 0) or (step % 230  == 0) or (step % 480 == 0) or (step % 540 == 0) or (step % 490 == 0):
-                    # add latent tensor for future visualization
-                    intermediate_tensors_for_viz.append(output)
+                # if step > 100:
+                #     if (step % 220 == 0) or (step % 230  == 0) or (step % 480 == 0) or (step % 540 == 0) or (step % 490 == 0):
+                #         # add latent tensor for future visualization
+                #         intermediate_tensors_for_viz.append(output)
+                #         visualize_mesh(predictions, f'pred_{step}_{args.type}')
+                #         visualize_mesh(mesh_gt, f'{step}_gt')
             else:
                 raise ValueError(f"Unknown type: {args.type}")
             # plt.imsave(f'vis/{step}_{args.type}.png', rend)
@@ -217,9 +220,15 @@ def evaluate_model(args):
     print('Done!')
     print("skipped", skipped)
 
-    # visualize intermediate tensors
-    # visualize_mesh_latents(intermediate_tensors_for_viz, args.type)
-    # visualize_mesh_latents_2(intermediate_tensors_for_viz, args.type)
+    # interpolated_tesors = []
+    # for i in range(len(intermediate_tensors_for_viz)-1):
+    #     for j in range(5):
+    #         left_weight = j*2*0.1
+    #         right_weight = 1 - left_weight
+    #         interpolated = left_weight * intermediate_tensors_for_viz[i] + right_weight * intermediate_tensors_for_viz[i+1]
+    #         interpolated_tesors.append(interpolated)
+
+    # handle.remove()
 
 """
 NOTE: TA comment on Piazza:

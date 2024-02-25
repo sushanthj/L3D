@@ -8,21 +8,21 @@ import wandb
 from model import SingleViewto3D
 from pytorch3d.datasets.r2n2.utils import collate_batched_R2N2
 from pytorch3d.ops import sample_points_from_meshes
-from r2n2_custom_fast import R2N2
+from r2n2_custom import R2N2
 
 
 def get_args_parser():
     parser = argparse.ArgumentParser("Singleto3D", add_help=False)
     # Model parameters
     parser.add_argument("--arch", default="resnet18", type=str)
-    parser.add_argument("--lr", default=5e-4, type=float)
+    parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--max_iter", default=20000, type=int)
     parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
     parser.add_argument(
         "--type", default="vox", choices=["vox", "point", "mesh"], type=str
     )
-    parser.add_argument("--n_points", default=1000, type=int)
+    parser.add_argument("--n_points", default=5000, type=int)
     parser.add_argument("--w_chamfer", default=1.0, type=float)
     parser.add_argument("--w_smooth", default=1.2, type=float)
     parser.add_argument("--save_freq", default=500, type=int)
@@ -30,6 +30,7 @@ def get_args_parser():
     parser.add_argument('--load_feat', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--wandb_run_name', default='voxel_2', type=str)
+    parser.add_argument('--return_voxels', default=False, type=bool)
     return parser
 
 
@@ -74,7 +75,7 @@ def train_model(args):
         dataset_location.SHAPENET_PATH,
         dataset_location.R2N2_PATH,
         dataset_location.SPLITS_PATH,
-        return_voxels=True, # set to False for point cloud and mesh
+        return_voxels=args.return_voxels, # set to False for point cloud and mesh
         return_feats=args.load_feat,
         use_cache=True, #! REMOVE THIS LINE WHEN YOU ARE DONE TESTING
     )
@@ -128,7 +129,7 @@ def train_model(args):
     # ============ preparing optimizer ... ============
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)  # to use with ViTs
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2000, 4000, 6000, 8000, 9000, 10000, 14000, 16000, 22000], gamma=0.8)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[26000], gamma=0.5)
     start_iter = 0
     start_time = time.time()
 
@@ -159,9 +160,6 @@ def train_model(args):
         prediction_3d = model(images_gt, args)
 
         loss = calculate_loss(prediction_3d, ground_truth_3d, args)
-
-        if args.type == "vox":
-            loss *= 10
 
         optimizer.zero_grad()
         loss.backward()
