@@ -139,4 +139,15 @@ class SingleViewto3D(nn.Module):
             # split the output into b x mesh_pred.verts_packed().shape[0] x 3
             # View((-1, self.mesh_pred.verts_packed().shape[0], 3))
         )
+        # decoder = nn.Sequential(
+        #     nn.Linear(512, 2048),
+        #     nn.GELU(),
+        #     nn.Linear(2048, 2048),
+        #     nn.GELU(),
+        #     nn.Linear(2048, self.n_verts*3),
+        #     nn.Tanh() # we want -1 to 1 output
+        #     # NOTE: self.mesh_pred.verts_packed().shape[0] includes the batch size
+        #     # split the output into b x mesh_pred.verts_packed().shape[0] x 3
+        #     # View((-1, self.mesh_pred.verts_packed().shape[0], 3))
+        # )
         return decoder

@@ -23,7 +23,7 @@ def visualize_voxels_as_mesh(voxel_grid, image_name):
     mesh = pytorch3d.structures.Meshes(vertices, faces, textures=textures).to(device)
     mesh_offset = -1*vertices.mean(dim=1).to(device)
     mesh = mesh.offset_verts(mesh_offset.repeat(n_verts,1)) # zero center the mesh
-    renderer = get_mesh_renderer(image_size=512)
+    renderer = get_mesh_renderer(image_size=1024)
     mesh = mesh.to(device)
 
     num_views = 12
@@ -111,7 +111,7 @@ def visualize_pointcloud(point_cloud, image_name):
     """
     device = get_device()
     renderer = get_points_renderer(
-    image_size=512, background_color=(1,1,1), device=device)
+    image_size=1024, background_color=(1,1,1), device=device)
 
     num_views = 12
     points = point_cloud[0]
@@ -126,7 +126,7 @@ def visualize_pointcloud(point_cloud, image_name):
     render_point_cloud = render_point_cloud.to(device)
 
     R, T = pytorch3d.renderer.look_at_view_transform(
-        dist=3,
+        dist=1.5,
         elev=0,
         azim=np.linspace(-180, 180, num_views, endpoint=False),
     )
@@ -158,7 +158,7 @@ def visualize_mesh(input_mesh, image_name):
     input_mesh: Meshes
     """
     device = get_device()
-    renderer = get_mesh_renderer(image_size=512)
+    renderer = get_mesh_renderer(image_size=1024)
 
     num_views = 12
     mesh = input_mesh
@@ -172,7 +172,109 @@ def visualize_mesh(input_mesh, image_name):
     mesh = mesh.to(device)
 
     R, T = pytorch3d.renderer.look_at_view_transform(
-        dist=2,
+        dist=1.5,
+        elev=0,
+        azim=np.linspace(-180, 180, num_views, endpoint=False),
+    )
+    many_cameras = pytorch3d.renderer.FoVPerspectiveCameras(
+        R=R,
+        T=T,
+        device=device
+    )
+    lights = pytorch3d.renderer.PointLights(location=[[0, 0, -3]], device=device)
+    images = renderer(mesh.extend(num_views), cameras=many_cameras, lights=lights)
+    fig, axs = plt.subplots(3, 4)
+    axs = axs.flatten()
+    for i, image in enumerate(images):
+        ax = axs[i]
+        ax.imshow(image.cpu())
+        ax.axis("off")
+
+    plt.savefig(f'images/mesh_{image_name}.png')
+    # Optionally, show the figure
+    # plt.show()
+    images = images.cpu().numpy()
+    img_list = [np.clip((img.squeeze() * 255).astype(np.uint8), 0, 255) for img in images]
+    imageio.mimsave(f'images/mesh_{image_name}.gif', img_list, loop=10, duration = 0.05)
+    plt.close()
+
+def visualize_mesh_latents(latents_list, image_name):
+    """
+    latents_list : list of latent vectors of the first linear layer of decoder
+    ref: https://arxiv.org/pdf/1603.08637.pdf
+    """
+    return
+    device = get_device()
+    renderer = get_mesh_renderer(image_size=1024)
+
+    # create 5 intermediate tensors between each two tensors in latents_list
+    intermediate_tensors = []
+    for i in range(len(latents_list)-1):
+        for j in range(5):
+            intermediate_tensors.append(latents_list[i] + (latents_list[i+1] - latents_list[i]) * j/5)
+
+    num_views = 12
+    mesh = input_mesh
+
+    verts_packed = mesh.verts_packed()
+    color=[0.7, 0.7, 1]
+    textures = torch.ones_like(verts_packed.unsqueeze(0)).to(device)
+    textures = textures * torch.tensor(color).to(device)
+    mesh.textures = pytorch3d.renderer.TexturesVertex(textures)
+
+    mesh = mesh.to(device)
+
+    R, T = pytorch3d.renderer.look_at_view_transform(
+        dist=1.5,
+        elev=0,
+        azim=np.linspace(-180, 180, num_views, endpoint=False),
+    )
+    many_cameras = pytorch3d.renderer.FoVPerspectiveCameras(
+        R=R,
+        T=T,
+        device=device
+    )
+    lights = pytorch3d.renderer.PointLights(location=[[0, 0, -3]], device=device)
+    images = renderer(mesh.extend(num_views), cameras=many_cameras, lights=lights)
+    fig, axs = plt.subplots(3, 4)
+    axs = axs.flatten()
+    for i, image in enumerate(images):
+        ax = axs[i]
+        ax.imshow(image.cpu())
+        ax.axis("off")
+
+    plt.savefig(f'images/mesh_{image_name}.png')
+    # Optionally, show the figure
+    # plt.show()
+    images = images.cpu().numpy()
+    img_list = [np.clip((img.squeeze() * 255).astype(np.uint8), 0, 255) for img in images]
+    imageio.mimsave(f'images/mesh_{image_name}.gif', img_list, loop=10, duration = 0.05)
+    plt.close()
+
+
+
+def visualize_mesh_latents_2(latents_list, image_name):
+    """
+    latents_list : list of latent vectors of the first linear layer of decoder
+    ref: https://arxiv.org/pdf/1603.08637.pdf
+    """
+    return
+    device = get_device()
+    renderer = get_mesh_renderer(image_size=1024)
+
+    num_views = 12
+    mesh = input_mesh
+
+    verts_packed = mesh.verts_packed()
+    color=[0.7, 0.7, 1]
+    textures = torch.ones_like(verts_packed.unsqueeze(0)).to(device)
+    textures = textures * torch.tensor(color).to(device)
+    mesh.textures = pytorch3d.renderer.TexturesVertex(textures)
+
+    mesh = mesh.to(device)
+
+    R, T = pytorch3d.renderer.look_at_view_transform(
+        dist=1.5,
         elev=0,
         azim=np.linspace(-180, 180, num_views, endpoint=False),
     )
