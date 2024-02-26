@@ -27,6 +27,7 @@ def get_args_parser():
 def fit_mesh(mesh_src, mesh_tgt, args):
     with torch.no_grad():
         visualize_mesh(mesh_src, "src_before_gradient_descent")
+        visualize_mesh(mesh_tgt, 'tgt_before_gradient_descent')
 
     start_iter = 0
     start_time = time.time()

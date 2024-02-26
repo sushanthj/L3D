@@ -45,7 +45,8 @@ class SingleViewto3D(nn.Module):
             self.n_verts = mesh_pred.verts_packed().shape[0]
             self.mesh_pred = pytorch3d.structures.Meshes(mesh_pred.verts_list()*args.batch_size, mesh_pred.faces_list()*args.batch_size)
             print(" pre model shape ", self.mesh_pred.verts_packed().shape)
-            self.mesh_decode = self.mesh_decoder()
+            n_verts = self.n_verts
+            self.mesh_decode = MeshDecoder(n_verts)
 
     def forward(self, images, args, intermediate_output=None):
         results = dict()
@@ -71,8 +72,6 @@ class SingleViewto3D(nn.Module):
             return pointclouds_pred
 
         elif args.type == "mesh":
-            n_verts = self.n_verts
-            self.mesh_decode = MeshDecoder(n_verts, intermediate_output)
             deform_vertices_pred = self.mesh_decode(encoded_feat)
             # print("post model shape ", (deform_vertices_pred.reshape([-1,3])).shape)
             # print(" pre model shape ", self.mesh_pred.verts_packed().shape)
@@ -140,9 +139,9 @@ class MeshDecoder(nn.Module):
         self.linear3 = nn.Linear(2048, self.n_verts*3)
         self.tanh = nn.Tanh()
 
-    def forward(self, x, intermediate_output=None):
+    def forward(self, img, intermediate_output=None):
         if intermediate_output is None:
-            x = self.linear1(x)
+            x = self.linear1(img)
         else:
             x = intermediate_output
         x = self.gelu1(x)

@@ -77,7 +77,6 @@ def train_model(args):
         dataset_location.SPLITS_PATH,
         return_voxels=args.return_voxels, # set to False for point cloud and mesh
         return_feats=args.load_feat,
-        use_cache=True, #! REMOVE THIS LINE WHEN YOU ARE DONE TESTING
     )
 
     loader = torch.utils.data.DataLoader(

@@ -27,7 +27,7 @@ def get_args_parser():
     parser.add_argument('--load_checkpoint', action='store_true')
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--load_feat', action='store_true')
-    parser.add_argument('--checkpoint_path', default='./checkpoints/point_v3_n1000.pth', type=str)
+    parser.add_argument('--checkpoint_path', default='./checkpoints/mesh_v4.pth', type=str)
     return parser
 
 def preprocess(feed_dict, args):
@@ -156,9 +156,14 @@ def evaluate_model(args):
     max_iter = len(eval_loader)
     skipped = 0
 
-    # handle = model.mesh_decode[0].register_forward_hook(hook)
+    # handle = model.mesh_decode.linear1.register_forward_hook(hook)
 
     for step in range(start_iter, max_iter):
+        if (step > 100) and ((step % 220 == 0) or (step % 230  == 0) or (step % 480 == 0) or (step % 540 == 0) or (step % 490 == 0)):
+            pass
+        else:
+            continue
+
         iter_start_time = time.time()
 
         read_start_time = time.time()
@@ -188,6 +193,7 @@ def evaluate_model(args):
                     skipped += 1
             elif args.type == "point":
                 visualize_pointcloud(predictions, f'{step}_{args.type}')
+                # visualize_point_difference(predictions, mesh_gt, f'diff_{step}_{args.type}')
             elif args.type == "mesh":
                 visualize_mesh(predictions, f'{step}_{args.type}')
                 # interpolate the best looking objects
@@ -229,6 +235,12 @@ def evaluate_model(args):
     #         interpolated_tesors.append(interpolated)
 
     # handle.remove()
+
+    # img_list = []
+    # # Now pass each individual tensor in interpolated_tesors through the model and visualize the output
+    # for i, tensor in enumerate(interpolated_tesors):
+    #     predictions = model(images_gt, args, intermediate_output=tensor)
+    #     img_list.append(render_mesh_to_img(predictions, f'interpolated_{i}_{args.type}'))
 
 """
 NOTE: TA comment on Piazza:
