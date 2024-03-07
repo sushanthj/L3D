@@ -2,7 +2,6 @@ import math
 from typing import List, NamedTuple
 
 import torch
-import torch.nn.functional as F
 from pytorch3d.renderer.cameras import CamerasBase
 
 
@@ -60,7 +59,7 @@ class RayBundle(object):
     def _replace(self, **kwargs):
         for key in kwargs.keys():
             setattr(self, key, kwargs[key])
-        
+
         return self
 
 
@@ -89,12 +88,10 @@ def get_pixels_from_image(image_size, camera):
     W, H = image_size[0], image_size[1]
 
     # TODO (Q1.3): Generate pixel coordinates from [0, W] in x and [0, H] in y
-    x = torch.arange(-1, 1, step=2/W, dtype=torch.float32)
-    y = torch.arange(-1, 1, step=2/H, dtype=torch.float32)
+    x = torch.linspace(-1, 1, steps=W, dtype=torch.float32)
+    y = torch.linspace(-1, 1, steps=H, dtype=torch.float32)
 
     # TODO (Q1.3): Convert to the range [-1, 1] in both x and y
-    import ipdb
-    ipdb.set_trace()
 
     # Create grid of coordinates
     xy_grid = torch.stack(
@@ -139,7 +136,8 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
         NOTE: camera object is of type pytorch3d.CamerasBase
     """
     # TODO (Q1.3): Map pixels to points on the image plane at Z=1
-    # ndc_points = xy_grid
+    #! (already done?)
+    ndc_points = xy_grid.to(device=camera.device)
 
     ndc_points = torch.cat(
         [
@@ -150,18 +148,19 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
     )
 
     # TODO (Q1.3): Use camera.unproject to get world space points from NDC space points
-    # image_plane_points = 
+    image_plane_points = camera.unproject_points(ndc_points, from_ndc=True)
 
     # TODO (Q1.3): Get ray origins from camera center
-    pass
+    # for each of the points on image_plane get the ray origin as camera center
+    rays_origin = camera.get_camera_center().expand(image_plane_points.shape[0], -1)
 
-    # TODO (Q1.3): Get ray directions as image_plane_points - rays_o
-    pass
+    # TODO (Q1.3): Get ray directions as image_plane_points - rays_origin
+    rays_d = torch.nn.functional.normalize(image_plane_points - rays_origin)
 
     # Create and return RayBundle
     return RayBundle(
-        rays_o,
+        rays_origin,
         rays_d,
-        torch.zeros_like(rays_o).unsqueeze(1),
-        torch.zeros_like(rays_o).unsqueeze(1),
+        torch.zeros_like(rays_origin).unsqueeze(1),
+        torch.zeros_like(rays_origin).unsqueeze(1),
     )

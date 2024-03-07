@@ -67,7 +67,7 @@ class Model(torch.nn.Module):
         self.renderer = renderer_dict[cfg.renderer.type](
             cfg.renderer
         )
-    
+
     def forward(self, ray_bundle):
         # NOTE: ray_bundle is our input volume
         # Call renderer with
@@ -97,14 +97,20 @@ def render_images(
 
         # TODO (Q1.3): Visualize xy grid using vis_grid
         if cam_idx == 0 and file_prefix == '':
-            pass
+            img = vis_grid(xy_grid, image_size)
+            plt.imshow(img)
+            # plt.show()
+            plt.savefig('images/1.3_xy_grid.png')
 
         # TODO (Q1.3): Visualize rays using vis_rays
         if cam_idx == 0 and file_prefix == '':
-            pass
-        
+            img = vis_rays(ray_bundle, image_size)
+            plt.imshow(img)
+            # plt.show()
+            plt.savefig('images/1.3_rays.png')
+
         # TODO (Q1.4): Implement point sampling along rays in sampler.py
-        pass
+        point_sample = model.sampler(ray_bundle)
 
         # TODO (Q1.4): Visualize sample points as point cloud
         if cam_idx == 0 and file_prefix == '':
