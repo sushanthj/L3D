@@ -13,37 +13,24 @@ class SphereSDF(torch.nn.Module):
     ):
         super().__init__()
 
-        self.radius = torch.nn.Parameter(
-            torch.tensor(cfg.radius.val).float(), requires_grad=cfg.radius.opt
-        )
-        self.center = torch.nn.Parameter(
-            torch.tensor(cfg.center.val).float().unsqueeze(0), requires_grad=cfg.center.opt
-        )
+        self.radius = torch.nn.Parameter(torch.tensor(cfg.radius.val).float(), requires_grad=cfg.radius.opt)
+        self.center = torch.nn.Parameter(torch.tensor(cfg.center.val).float().unsqueeze(0), requires_grad=cfg.center.opt)
 
     def forward(self, points):
         points = points.view(-1, 3)
 
-        return torch.linalg.norm(
-            points - self.center,
-            dim=-1,
-            keepdim=True
-        ) - self.radius
+        return torch.linalg.norm(points - self.center, dim=-1, keepdim=True) - self.radius
 
 
 # Box SDF class
 class BoxSDF(torch.nn.Module):
-    def __init__(
-        self,
-        cfg
-    ):
+    def __init__(self, cfg):
         super().__init__()
 
         self.center = torch.nn.Parameter(
-            torch.tensor(cfg.center.val).float().unsqueeze(0), requires_grad=cfg.center.opt
-        )
+            torch.tensor(cfg.center.val).float().unsqueeze(0), requires_grad=cfg.center.opt)
         self.side_lengths = torch.nn.Parameter(
-            torch.tensor(cfg.side_lengths.val).float().unsqueeze(0), requires_grad=cfg.side_lengths.opt
-        )
+            torch.tensor(cfg.side_lengths.val).float().unsqueeze(0), requires_grad=cfg.side_lengths.opt)
 
     def forward(self, points):
         points = points.view(-1, 3)

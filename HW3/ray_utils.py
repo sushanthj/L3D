@@ -89,10 +89,12 @@ def get_pixels_from_image(image_size, camera):
     W, H = image_size[0], image_size[1]
 
     # TODO (Q1.3): Generate pixel coordinates from [0, W] in x and [0, H] in y
-    pass
+    x = torch.arange(-1, 1, step=2/W, dtype=torch.float32)
+    y = torch.arange(-1, 1, step=2/H, dtype=torch.float32)
 
     # TODO (Q1.3): Convert to the range [-1, 1] in both x and y
-    pass
+    import ipdb
+    ipdb.set_trace()
 
     # Create grid of coordinates
     xy_grid = torch.stack(
@@ -106,9 +108,12 @@ def get_pixels_from_image(image_size, camera):
 # Random subsampling of pixels from an image
 def get_random_pixels_from_image(n_pixels, image_size, camera):
     xy_grid = get_pixels_from_image(image_size, camera)
-    
+    # NOTE: xy_grid is of shape (W * H, 2)
+
     # TODO (Q2.1): Random subsampling of pixel coordinaters
-    pass
+    # Create random mask of xy_grid
+    mask = torch.randperm(xy_grid.shape[0])
+    xy_grid_sub = xy_grid[mask]
 
     # Return
     return xy_grid_sub.reshape(-1, 2)[:n_pixels]
@@ -118,8 +123,23 @@ def get_random_pixels_from_image(n_pixels, image_size, camera):
 def get_rays_from_pixels(xy_grid, image_size, camera):
     W, H = image_size[0], image_size[1]
 
+    """
+    Projection of [XYZ] to [xy] is given by the camera parameters (intrinsic and extrinsic) as:
+        # for perspective camera (What we'll use)
+        x = fx * X / Z + px
+        y = fy * Y / Z + py
+        z = 1 / Z
+
+        # for orthographic camera
+        x = fx * X + px
+        y = fy * Y + py
+        z = Z
+
+        In this case, Z = 1 and camera intrinsics and extrinsics are given by camera object
+        NOTE: camera object is of type pytorch3d.CamerasBase
+    """
     # TODO (Q1.3): Map pixels to points on the image plane at Z=1
-    pass
+    # ndc_points = xy_grid
 
     ndc_points = torch.cat(
         [
@@ -130,7 +150,7 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
     )
 
     # TODO (Q1.3): Use camera.unproject to get world space points from NDC space points
-    pass
+    # image_plane_points = 
 
     # TODO (Q1.3): Get ray origins from camera center
     pass

@@ -48,34 +48,33 @@ class Model(torch.nn.Module):
     ):
         super().__init__()
 
-        # Get implicit function from config
+        #? Define 3 components of the model: scence, sampling routine, and renderer
+
+        #? The scene (volumes or objects)
+        # Get implicit function from config (see implicit.py for details)
         self.implicit_fn = implicit_dict[cfg.implicit_function.type](
             cfg.implicit_function
         )
 
-        # Point sampling (raymarching) scheme
+        #? The sampling routine (ray marching)
+        # Point sampling (raymarching) scheme (see sampler.py for details)
         self.sampler = sampler_dict[cfg.sampler.type](
             cfg.sampler
         )
 
-        # Initialize volume renderer
+        #? The renderer
+        # Initialize volume renderer (see renderer.py for details)
         self.renderer = renderer_dict[cfg.renderer.type](
             cfg.renderer
         )
     
-    def forward(
-        self,
-        ray_bundle
-    ):
+    def forward(self, ray_bundle):
+        # NOTE: ray_bundle is our input volume
         # Call renderer with
         #  a) Implicit volume
         #  b) Sampling routine
 
-        return self.renderer(
-            self.sampler,
-            self.implicit_fn,
-            ray_bundle
-        )
+        return self.renderer(self.sampler, self.implicit_fn, ray_bundle)
 
 
 def render_images(
