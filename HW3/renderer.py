@@ -20,31 +20,65 @@ class VolumeRenderer(torch.nn.Module):
         self,
         deltas,
         rays_density: torch.Tensor,
-        eps: float = 1e-10
-    ):
+        eps: float = 1e-10):
+        """
+
+        Args:
+            deltas : distance between each sample (self._chunk_size, n_pts, 1)
+            rays_density (torch.Tensor): (self._chunk_size, n_pts, 1)
+            eps (float, optional): Defaults to 1e-10.
+
+        Returns:
+            _type_: _description_
+        """
         # TODO (1.5): Compute transmittance using the equation described in the README
-        pass
+        num_rays, num_sample_points, _ = deltas.shape
+        transmittances = []
+        transmittances.append(torch.ones((num_rays, 1)).to(deltas.device)) # first transmittance is 1
+
+        for i in range(1, num_sample_points):
+            transmittances.append(transmittances[i-1] * torch.exp(-rays_density[:, i-1] * deltas[:, i-1] + eps))
 
         # TODO (1.5): Compute weight used for rendering from transmittance and alpha
-        return weights
-    
+        transmittances_stacked = torch.stack(transmittances, dim=1)
+        # the below line implements the T(x, x_t) * (1 - e^{−σ(x) * δx}) part of the equation => we'll call this 'weights'
+        return transmittances_stacked * (1 - torch.exp(-rays_density*deltas+eps)) # -> weights
+
     def _aggregate(
         self,
         weights: torch.Tensor,
-        rays_feature: torch.Tensor
-    ):
-        # TODO (1.5): Aggregate (weighted sum of) features using weights
-        pass
+        rays_feature: torch.Tensor):
+        """
 
+        Args:
+            weights (torch.Tensor): (self._chunk_size, n_pts, 1) (Absorption for each channel)
+            rays_feature (torch.Tensor): (self._chunk_size*n_pts, 3) (Emittance for each channel)
+
+        Returns:
+            feature : Final Attribute (color or depth) for each ray
+        """
+        # TODO (1.5): Aggregate (weighted sum of) features using weights
+        feature = torch.sum((weights*rays_feature), dim=1)
         return feature
+
 
     def forward(
         self,
         sampler,
         implicit_fn,
-        ray_bundle,
-    ):
-        B = ray_bundle.shape[0]
+        ray_bundle):
+        """
+
+        Args:
+            sampler : Samples points along rays ( see StratifiedRaysampler in sampler.py)
+            implicit_fn : Implicit function ( see SphereTracingSDF in implicit.py)
+            ray_bundle : Ray Bundle object with ray origins and directions of shape  (N, 3) where N = number of rays
+                         and sample points and lengths of shape (N, n_pts_per_ray, 3)
+
+        Returns:
+            out : Returns color and depth information for each ray
+        """
+        B = ray_bundle.shape[0] # ray_bundle.shape = (N,)
 
         # Process the chunks of rays.
         chunk_outputs = []
@@ -54,15 +88,16 @@ class VolumeRenderer(torch.nn.Module):
 
             # Sample points along the ray
             cur_ray_bundle = sampler(cur_ray_bundle)
-            n_pts = cur_ray_bundle.sample_shape[1]
+            n_pts = cur_ray_bundle.sample_shape[1] # number of sample pts along each ray
 
             # Call implicit function with sample points
-            implicit_output = implicit_fn(cur_ray_bundle)
-            density = implicit_output['density']
-            feature = implicit_output['feature']
+            implicit_output = implicit_fn(cur_ray_bundle) # gives the signed_distance for the query points
+            density = implicit_output['density'] # shape = (self._chunk_size*n_pts, 1) : The density value of that discrete volume
+            feature = implicit_output['feature'] # shape = (self._chunk_size*n_pts, 3) : Emittance for each discrete volume for RGB channels
 
             # Compute length of each ray segment
-            depth_values = cur_ray_bundle.sample_lengths[..., 0]
+            # NOTE: cur_ray_bundle.sample_lengths.shape = (self._chunk_size, n_pts, n_pts)
+            depth_values = cur_ray_bundle.sample_lengths[..., 0] # depth_values.shape = (self._chunk_size, n_pts)
             deltas = torch.cat(
                 (
                     depth_values[..., 1:] - depth_values[..., :-1],
@@ -71,23 +106,27 @@ class VolumeRenderer(torch.nn.Module):
                 dim=-1,
             )[..., None]
 
-            # Compute aggregation weights
+            # Compute aggregation weights (Absorption for each voulme)
             weights = self._compute_weights(
-                deltas.view(-1, n_pts, 1),
-                density.view(-1, n_pts, 1)
-            ) 
+                deltas.view(-1, n_pts, 1), # shape = (self._chunk_size, n_pts, 1)
+                density.view(-1, n_pts, 1) # shape = (self._chunk_size, n_pts, 1)
+            )
 
             # TODO (1.5): Render (color) features using weights
-            pass
+            # weiths.shape = (self._chunk_size, n_pts, 1)
+            # feature.shape = (self._chunk_size*n_pts, 3)
+            feature = self._aggregate(weights, feature.view(-1, n_pts, 3))
 
             # TODO (1.5): Render depth map
-            pass
+            # depth_values.shape = (self._chunk_size, n_pts)
+            depth = self._aggregate(weights, depth_values.view(-1, n_pts, 1))
 
             # Return
             cur_out = {
                 'feature': feature,
                 'depth': depth,
             }
+            # shape = (N, 3) for feature and (N, 1) for depth
 
             chunk_outputs.append(cur_out)
 
@@ -115,7 +154,7 @@ class SphereTracingRenderer(torch.nn.Module):
         self.near = cfg.near
         self.far = cfg.far
         self.max_iters = cfg.max_iters
-    
+
     def sphere_tracing(
         self,
         implicit_fn,

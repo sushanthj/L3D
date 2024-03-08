@@ -124,7 +124,8 @@ def render_images(
             render_points(f'images/1.4_samples_{cam_idx}.png', points_reshaped)
 
         # TODO (Q1.5): Implement rendering in renderer.py
-        out = model(ray_bundle)
+        #! May need to pass new_ray_bundle instead of ray_bundle 
+        out = model(ray_bundle) # calls model.forward
 
         # Return rendered features (colors)
         image = np.array(
@@ -144,7 +145,7 @@ def render_images(
                 f'{file_prefix}_{cam_idx}.png',
                 image
             )
-    
+
     return all_images
 
 

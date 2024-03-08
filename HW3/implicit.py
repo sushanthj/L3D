@@ -31,8 +31,16 @@ class BoxSDF(torch.nn.Module):
             torch.tensor(cfg.center.val).float().unsqueeze(0), requires_grad=cfg.center.opt)
         self.side_lengths = torch.nn.Parameter(
             torch.tensor(cfg.side_lengths.val).float().unsqueeze(0), requires_grad=cfg.side_lengths.opt)
+        """
+        example for box:
+            self.center = torch.nn.Parameter([0.0, 0.0, 0.0].unsqueeze(0), requires_grad=True)
+            self.side_lengths = torch.nn.Parameter([1.75, 1.75, 1.75].unsqueeze(0), requires_grad=True)
+        """
 
     def forward(self, points):
+        """
+        Here we'll get the SDF value at the queried points using our above self.center and self.side_lengths
+        """
         points = points.view(-1, 3)
         diff = torch.abs(points - self.center) - self.side_lengths / 2.0
 
