@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import tqdm
 import imageio
+import ipdb
 
 from omegaconf import DictConfig
 from PIL import Image
@@ -34,6 +35,7 @@ from dataset import (
     get_nerf_datasets,
     trivial_collate,
 )
+from render_functions import render_points
 
 
 # Model class containing:
@@ -93,6 +95,8 @@ def render_images(
         torch.cuda.empty_cache()
         camera = camera.to(device)
         xy_grid = get_pixels_from_image(image_size, camera) # TODO (Q1.3): implement in ray_utils.py
+        # NOTE: ray_bundle is a custom class with fields: ray_origins, ray_directions, and ray_lengths
+        #       we write functions to find ray origins and directions which get combined into ray_bundle
         ray_bundle = get_rays_from_pixels(xy_grid, image_size, camera) # TODO (Q1.3): implement in ray_utils.py
 
         # TODO (Q1.3): Visualize xy grid using vis_grid
@@ -100,21 +104,24 @@ def render_images(
             img = vis_grid(xy_grid, image_size)
             plt.imshow(img)
             # plt.show()
-            plt.savefig('images/1.3_xy_grid.png')
+            plt.savefig(f'images/1.3_{cam_idx}_xy_grid.png')
 
         # TODO (Q1.3): Visualize rays using vis_rays
         if cam_idx == 0 and file_prefix == '':
             img = vis_rays(ray_bundle, image_size)
             plt.imshow(img)
             # plt.show()
-            plt.savefig('images/1.3_rays.png')
+            plt.savefig(f'images/1.3_{cam_idx}_rays.png')
 
         # TODO (Q1.4): Implement point sampling along rays in sampler.py
-        point_sample = model.sampler(ray_bundle)
+        new_ray_bundle = model.sampler(ray_bundle) # calls forward function of StratifiedRaysampler
 
         # TODO (Q1.4): Visualize sample points as point cloud
         if cam_idx == 0 and file_prefix == '':
-            pass
+            # NOTE new_ray_bundle.sample_points has shape = (N, D, 3) as N points, D samples, and 3 coordinates for each
+            #      we reshape it to (1, N*D, 3) to visualize it as a point cloud
+            points_reshaped = new_ray_bundle.sample_points.view(-1, 3).unsqueeze(0)
+            render_points(f'images/1.4_samples_{cam_idx}.png', points_reshaped)
 
         # TODO (Q1.5): Implement rendering in renderer.py
         out = model(ray_bundle)

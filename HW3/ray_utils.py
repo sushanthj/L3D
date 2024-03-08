@@ -88,10 +88,9 @@ def get_pixels_from_image(image_size, camera):
     W, H = image_size[0], image_size[1]
 
     # TODO (Q1.3): Generate pixel coordinates from [0, W] in x and [0, H] in y
+    # TODO (Q1.3): Convert to the range [-1, 1] in both x and y
     x = torch.linspace(-1, 1, steps=W, dtype=torch.float32)
     y = torch.linspace(-1, 1, steps=H, dtype=torch.float32)
-
-    # TODO (Q1.3): Convert to the range [-1, 1] in both x and y
 
     # Create grid of coordinates
     xy_grid = torch.stack(
@@ -127,40 +126,46 @@ def get_rays_from_pixels(xy_grid, image_size, camera):
         y = fy * Y / Z + py
         z = 1 / Z
 
-        # for orthographic camera
-        x = fx * X + px
-        y = fy * Y + py
-        z = Z
+        # But, we have an additional stage where we can resacle objects such that all objects are in the range [-1, 1]
+        # This is called Normalized Device Coordinates (NDC) space
 
-        In this case, Z = 1 and camera intrinsics and extrinsics are given by camera object
+        In this case, Z = 1 and we can use camera.unproject_points to go from NDC space the world space points
         NOTE: camera object is of type pytorch3d.CamerasBase
     """
     # TODO (Q1.3): Map pixels to points on the image plane at Z=1
-    #! (already done?)
     ndc_points = xy_grid.to(device=camera.device)
 
     ndc_points = torch.cat(
         [
             ndc_points,
-            torch.ones_like(ndc_points[..., -1:])
+            torch.ones_like(ndc_points[..., -1:], device=camera.device)
         ],
         dim=-1
     )
 
     # TODO (Q1.3): Use camera.unproject to get world space points from NDC space points
     image_plane_points = camera.unproject_points(ndc_points, from_ndc=True)
+    # ipdb> image_plane_points[1]
+    # tensor([ 0.9922,  1.0000, -2.0000], device='cuda:0')
 
     # TODO (Q1.3): Get ray origins from camera center
-    # for each of the points on image_plane get the ray origin as camera center
+    # origin is of shape (1,3) i.e. just a point in 3D, we'll expand that to be the ray origin for all
+    # points on the image plane
     rays_origin = camera.get_camera_center().expand(image_plane_points.shape[0], -1)
+    # assert rays_origin.shape == image_plane_points.shape -> THIS SHOULD BE TRUE
 
     # TODO (Q1.3): Get ray directions as image_plane_points - rays_origin
     rays_d = torch.nn.functional.normalize(image_plane_points - rays_origin)
 
     # Create and return RayBundle
+    """
+    NOTE: if image_plane_points.shape = torch.Size([65536, 3]),
+          then rays_origin.shape = torch.Size([65536, 3])
+          and sample_lenths.shape = torch.Size([65536, 1, 3])
+    """
     return RayBundle(
         rays_origin,
         rays_d,
-        torch.zeros_like(rays_origin).unsqueeze(1),
-        torch.zeros_like(rays_origin).unsqueeze(1),
+        sample_lengths=torch.zeros_like(rays_origin).unsqueeze(1),
+        sample_points=torch.zeros_like(rays_origin).unsqueeze(1),
     )
