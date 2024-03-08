@@ -125,7 +125,7 @@ def render_images(
 
         # TODO (Q1.5): Implement rendering in renderer.py
         #! May need to pass new_ray_bundle instead of ray_bundle 
-        out = model(ray_bundle) # calls model.forward
+        out = model(new_ray_bundle) # calls model.forward
 
         # Return rendered features (colors)
         image = np.array(
@@ -137,7 +137,10 @@ def render_images(
 
         # TODO (Q1.5): Visualize depth
         if cam_idx == 2 and file_prefix == '':
-            pass
+            depth_image = out['depth'].view(image_size[1], image_size[0]).detach()
+            # Normalize the depth image
+            depth_image = torch.nn.functional.normalize(depth_image, p=2, dim=0).cpu().numpy()
+            plt.imsave(f'images/depth_{cam_idx}.png',  depth_image)
 
         # Save
         if save:
@@ -171,7 +174,7 @@ def train(
     model = Model(cfg)
     model = model.cuda(); model.train()
 
-    # Create dataset 
+    # Create dataset
     train_dataset = dataset_from_config(cfg.data)
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
@@ -182,7 +185,7 @@ def train(
     )
     image_size = cfg.data.image_size
 
-    # Create optimizer 
+    # Create optimizer
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=cfg.training.lr
