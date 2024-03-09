@@ -279,7 +279,7 @@ class VolumeSDFRenderer(VolumeRenderer):
             weights = self._compute_weights(
                 deltas.view(-1, n_pts, 1),
                 density.view(-1, n_pts, 1)
-            ) 
+            )
 
             geometry_color = torch.zeros_like(color)
 

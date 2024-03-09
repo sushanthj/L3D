@@ -124,7 +124,6 @@ def render_images(
             render_points(f'images/1.4_samples_{cam_idx}.png', points_reshaped)
 
         # TODO (Q1.5): Implement rendering in renderer.py
-        #! May need to pass new_ray_bundle instead of ray_bundle 
         out = model(new_ray_bundle) # calls model.forward
 
         # Return rendered features (colors)
@@ -137,9 +136,9 @@ def render_images(
 
         # TODO (Q1.5): Visualize depth
         if cam_idx == 2 and file_prefix == '':
-            depth_image = out['depth'].view(image_size[1], image_size[0]).detach()
-            # Normalize the depth image
-            depth_image = torch.nn.functional.normalize(depth_image, p=2, dim=0).cpu().numpy()
+            depth_image = out['depth'].view(image_size[1], image_size[0]).detach().cpu().numpy()
+            # # Normalize the depth image
+            # depth_image = torch.nn.functional.normalize(depth_image, p=2, dim=0).cpu().numpy()
             plt.imsave(f'images/depth_{cam_idx}.png',  depth_image)
 
         # Save

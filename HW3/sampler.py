@@ -34,8 +34,11 @@ class StratifiedRaysampler(torch.nn.Module):
         """
 
         origins_expanded = ray_bundle.origins.unsqueeze(1)  # Shape: (N, 1, 3)
+        origins_expanded = origins_expanded.expand(-1, self.n_pts_per_ray, -1)  # Shape: (N, D, 3)
         directions_expanded = ray_bundle.directions.unsqueeze(1)  # Shape: (N, 1, 3)
-        z_vals_expanded = z_vals.unsqueeze(0).unsqueeze(-1)  # Shape: (1, D, 1)
+        directions_expanded = directions_expanded.expand(-1, self.n_pts_per_ray, -1)  # Shape: (N, D, 3)
+        # conver z_vals to shape Shape: (1, D, 1)
+        z_vals_expanded = z_vals.expand(ray_bundle.origins.shape[0], -1).unsqueeze(-1)  # Shape: (1, D, 1)
 
         # Compute sample points
         # (N, D, 3) = (N, 1, 3) + (1, D, 1) * (N, 1, 3)
@@ -44,7 +47,7 @@ class StratifiedRaysampler(torch.nn.Module):
         # Return
         return ray_bundle._replace(
             sample_points=new_sample_points,
-            sample_lengths=z_vals * torch.ones_like(new_sample_points[..., :1]), # shape = (N, D, 1)
+            sample_lengths=z_vals_expanded * torch.ones_like(new_sample_points[..., :1]), # shape = (N, D, 1)
         )
 
 
