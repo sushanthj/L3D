@@ -163,7 +163,7 @@ def render(
     all_images = render_images(
         model, cameras, cfg.data.image_size
     )
-    imageio.mimsave('images/part_1.gif', [np.uint8(im * 255) for im in all_images])
+    imageio.mimsave('images/part_1.gif', [np.uint8(im * 255) for im in all_images], loop=10000, duration=0.5)
 
 
 def train(
@@ -190,6 +190,9 @@ def train(
         lr=cfg.training.lr
     )
 
+    # Define Loss Criterion
+    criterion = torch.nn.MSELoss()
+
     # Render images before training
     cameras = [item['camera'] for item in train_dataset]
     render_images(
@@ -215,7 +218,7 @@ def train(
             out = model(ray_bundle)
 
             # TODO (Q2.2): Calculate loss
-            loss = None
+            loss = criterion(out['feature'], rgb_gt)
 
             # Backprop
             optimizer.zero_grad()
@@ -230,6 +233,11 @@ def train(
     print("Box center:", tuple(np.array(model.implicit_fn.sdf.center.data.detach().cpu()).tolist()[0]))
     print("Box side lengths:", tuple(np.array(model.implicit_fn.sdf.side_lengths.data.detach().cpu()).tolist()[0]))
 
+    """
+    Box center: (0.25023025274276733, 0.2505767345428467, -0.00048047900781966746)
+    Box side lengths: (2.0051093101501465, 1.503579020500183, 1.5033588409423828)
+    """
+
     # Render images after training
     render_images(
         model, cameras, image_size,
@@ -238,7 +246,7 @@ def train(
     all_images = render_images(
         model, create_surround_cameras(3.0, n_poses=20), image_size, file_prefix='part_2'
     )
-    imageio.mimsave('images/part_2.gif', [np.uint8(im * 255) for im in all_images])
+    imageio.mimsave('images/part_2.gif', [np.uint8(im * 255) for im in all_images], loop=10000, duration=1.0)
 
 
 def create_model(cfg):
@@ -299,6 +307,9 @@ def train_nerf(
     # Create model
     model, optimizer, lr_scheduler, start_epoch, checkpoint_path = create_model(cfg)
 
+    # Define Loss Criterion
+    criterion = torch.nn.MSELoss()
+
     # Load the training/validation data.
     train_dataset, val_dataset, _ = get_nerf_datasets(
         dataset_name=cfg.data.dataset_name,
@@ -335,7 +346,7 @@ def train_nerf(
             out = model(ray_bundle)
 
             # TODO (Q3.1): Calculate loss
-            loss = None
+            loss = criterion(out['feature'], rgb_gt)
 
             # Take the training step.
             optimizer.zero_grad()

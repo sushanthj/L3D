@@ -71,7 +71,7 @@ def sample_images_at_xy(
     batch_size = images.shape[0]
     spatial_size = images.shape[1:-1]
 
-    xy_grid = -xy_grid.view(batch_size, -1, 1, 2)
+    xy_grid = -xy_grid.view(batch_size, -1, 1, 2).to(device=images.device)
 
     images_sampled = torch.nn.functional.grid_sample(
         images.permute(0, 3, 1, 2),
@@ -111,8 +111,7 @@ def get_random_pixels_from_image(n_pixels, image_size, camera):
     mask = torch.randperm(xy_grid.shape[0])
     xy_grid_sub = xy_grid[mask]
 
-    # Return
-    return xy_grid_sub.reshape(-1, 2)[:n_pixels]
+    return xy_grid_sub.reshape(-1, 2)[:n_pixels] # shape = (num grid_pts, x and y)
 
 
 # Get rays from pixel values

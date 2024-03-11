@@ -241,11 +241,20 @@ class MLPWithInputSkips(torch.nn.Module):
         self,
         n_layers: int,
         input_dim: int,
-        output_dim: int,
+        # output_dim: int,
         skip_dim: int,
         hidden_dim: int,
         input_skips,
     ):
+        """
+
+        Args:
+            n_layers (int): number of layers in MLP
+            input_dim (int): input dimension at first layer of MLP
+            skip_dim (int):  # dimension of skip connection which gets added to layer: in our case it's the input_dim
+            hidden_dim (int): # output size of each layer
+            input_skips (List): At which layer the input will be added to a layer's output as skip connection
+        """
         super().__init__()
 
         layers = []
@@ -267,6 +276,11 @@ class MLPWithInputSkips(torch.nn.Module):
         self.mlp = torch.nn.ModuleList(layers)
         self._input_skips = set(input_skips)
 
+        # xavier init the weights
+        for layer in self.mlp:
+            torch.nn.init.xavier_uniform_(layer[0].weight)
+            torch.nn.init.zeros_(layer[0].bias)
+
     def forward(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
         y = x
 
@@ -279,12 +293,23 @@ class MLPWithInputSkips(torch.nn.Module):
         return y
 
 
-# TODO (Q3.1): Implement NeRF MLP
+# TODO (Q3.1): Implement NeRF MLP without View Dependence
 class NeuralRadianceField(torch.nn.Module):
-    def __init__(
-        self,
-        cfg,
-    ):
+    def __init__(self, cfg):
+        """
+        Architecture for NeRF MLP without View Dependence
+
+              -> |  -> |  -> |  -> |  -> |  -> |  -> |  -> |
+        input -> |  -> |  -> |  -> |  -> |  -> |  -> |  -> | -> Linear(hidden_dim, 4) -> output
+          |   -> |  -> |  -> |  -> |  -> |  -> |  -> |  -> |
+          |                        |
+          └──-----skip con---------'
+
+
+        Relu[output[..., 0]] = Density prediciton
+        Sigmoid[output[..., 1:4]] = Feature/Color prediction
+
+        """
         super().__init__()
 
         self.harmonic_embedding_xyz = HarmonicEmbedding(3, cfg.n_harmonic_functions_xyz)
@@ -293,7 +318,115 @@ class NeuralRadianceField(torch.nn.Module):
         embedding_dim_xyz = self.harmonic_embedding_xyz.output_dim
         embedding_dim_dir = self.harmonic_embedding_dir.output_dim
 
-        pass
+        # MLP for xyz (no view dependence) equivalent to constructing upto 8th layer of MLP shown in NERF paper
+        self.MLP = MLPWithInputSkips(
+            n_layers = cfg.n_layers_xyz, # number of layers in MLP
+            input_dim = embedding_dim_xyz, # the Harmonic embedding layer between the input and the 1st hidden layer of MLP
+            # output_dim = None, # seems to not be used in MLPWithInputSkips
+            skip_dim = embedding_dim_xyz, # dimension of skip connection which gets added to layer: in our case it's the input_dim
+            hidden_dim = cfg.n_hidden_neurons_xyz, # output size of each layer
+            input_skips = cfg.append_xyz, # list of layers where skip connection is added eg. [4] as per NERF paper
+        )
+        self.final_linear = torch.nn.Linear(cfg.n_hidden_neurons_xyz, 4) # as cfg.n_hidden_neurons_xyz = hidden_dim
+
+        self.relu = torch.nn.ReLU()
+        self.sigmoid = torch.nn.Sigmoid()
+
+    """
+    Your MLP should take in a RayBundle object in its forward method, and produce color and density for each sample point in the RayBundle.
+    """
+    def forward(self, ray_bundle):
+        embedding_xyz = self.harmonic_embedding_xyz(ray_bundle.sample_points.view(-1, 3))
+        # import ipdb
+        # ipdb.set_trace()
+        x = self.MLP(x=embedding_xyz, z=embedding_xyz) # x = input, z = skip connection
+        x = self.final_linear(x)
+        density = self.relu(x[:, 0].unsqueeze(-1))
+        feature = self.sigmoid(x[:, 1:])
+        out = {'density': density, 'feature': feature}
+
+        return out
+
+
+
+# TODO (Q4.1): Implement NeRF MLP with View Dependence
+class NeuralRadianceField_withView(torch.nn.Module):
+    def __init__(self, cfg):
+        """
+        Architecture for NeRF MLP without View Dependence
+
+              -> |  -> |  -> |  -> |  -> |  -> |  -> |  -> |
+        input -> |  -> |  -> |  -> |  -> |  -> |  -> |  -> | -> Linear(hidden_dim, hidden_dim+1) -> output
+          |   -> |  -> |  -> |  -> |  -> |  -> |  -> |  -> |
+          |                        |
+          └──-----skip con---------'
+
+
+        - Density prediciton = Relu[output[..., 0]]
+
+        - concat_dir_xyz = torch.cat((embedding_dir, x[:, 1:]), dim=1)
+        - feature_pred = MLP(concat_dir_xyz)
+        - feature = Linear(feature_pred, 3)
+
+        - Feature/Color prediction = Sigmoid[feature]
+        """
+        super().__init__()
+
+        self.harmonic_embedding_xyz = HarmonicEmbedding(3, cfg.n_harmonic_functions_xyz)
+        self.harmonic_embedding_dir = HarmonicEmbedding(3, cfg.n_harmonic_functions_dir)
+
+        embedding_dim_xyz = self.harmonic_embedding_xyz.output_dim
+        embedding_dim_dir = self.harmonic_embedding_dir.output_dim
+
+        # MLP for xyz (no view dependence) equivalent to constructing upto 8th layer of MLP shown in NERF paper
+        self.xyz_MLP = MLPWithInputSkips(
+            n_layers = cfg.n_layers_xyz, # number of layers in MLP
+            input_dim = embedding_dim_xyz, # the Harmonic embedding layer between the input and the 1st hidden layer of MLP
+            output_dim = None, # seems to not be used in MLPWithInputSkips
+            skip_dim = embedding_dim_xyz, # the layer which gets used as skip connection
+            hidden_dim = cfg.n_hidden_neurons_xyz, # output size of each layer
+            input_skips = [4], # list of layers where skip connection is added eg. [4] as per NERF paper
+        )
+
+        self.feature_MLP = torch.nn.Sequential(
+                torch.nn.Linear(embedding_dim_dir+cfg.n_hidden_neurons_xyz, cfg.n_hidden_neurons_dir),
+                torch.nn.ReLU(),
+                torch.nn.Linear(cfg.n_hidden_neurons_dir, 3),
+                torch.nn.Sigmoid()
+            )
+
+        self.xyz_to_sigma = torch.nn.Sequential(
+                torch.nn.Linear(cfg.n_hidden_neurons_xyz, 1),
+                torch.nn.ReLU()
+            )
+
+        self.xyz_to_feature_transition = torch.nn.Sequential(
+                torch.nn.Linear(cfg.n_hidden_neurons_xyz, cfg.n_hidden_neurons_xyz),
+                torch.nn.ReLU()
+            )
+
+
+    def forward(self, ray_bundle):
+        # xyz part of network
+        embedding_xyz = self.harmonic_embedding_xyz(ray_bundle.sample_points.view(-1, 3))
+        x = self.xyz_MLP(x=embedding_xyz, z=embedding_xyz)
+
+        # network splits into two parts here
+        density = self.xyz_to_sigma(x)
+        feature = self.xyz_to_feature_transition(x)
+
+        # making the transition
+        embedding_dir = self.harmonic_embedding_dir(ray_bundle.directions).unsqueeze(1)
+        embedding_dir = torch.tile(embedding_dir, (1, feature.shape[1], 1))
+        concat_xyz_and_dir = torch.cat((embedding_dir, feature), dim=-1)
+        feature = self.feature_MLP(x=concat_xyz_and_dir, z=concat_xyz_and_dir)
+
+        # Feature MLP
+        feature = self.feature_MLP(feature)
+
+        out = {'density': density, 'feature': feature}
+
+        return out
 
 
 class NeuralSurface(torch.nn.Module):
@@ -316,7 +449,7 @@ class NeuralSurface(torch.nn.Module):
         '''
         points = points.view(-1, 3)
         pass
-    
+
     def get_color(
         self,
         points
@@ -328,7 +461,7 @@ class NeuralSurface(torch.nn.Module):
         '''
         points = points.view(-1, 3)
         pass
-    
+
     def get_distance_color(
         self,
         points
@@ -340,7 +473,7 @@ class NeuralSurface(torch.nn.Module):
         You may just implement this by independent calls to get_distance, get_color
             but, depending on your MLP implementation, it maybe more efficient to share some computation
         '''
-        
+
     def forward(self, points):
         return self.get_distance(points)
 
@@ -363,7 +496,7 @@ class NeuralSurface(torch.nn.Module):
                 retain_graph=has_grad,
                 only_inputs=True
             )[0]
-        
+
         return distance, gradient
 
 
@@ -372,4 +505,5 @@ implicit_dict = {
     'nerf': NeuralRadianceField,
     'sdf_surface': SDFSurface,
     'neural_surface': NeuralSurface,
+    'nerf_with_view': NeuralRadianceField_withView,
 }
