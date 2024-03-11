@@ -294,7 +294,7 @@ class MLPWithInputSkips(torch.nn.Module):
 
 
 # TODO (Q3.1): Implement NeRF MLP without View Dependence
-class NeuralRadianceField(torch.nn.Module):
+class NeuralRadianceField_without_view(torch.nn.Module):
     def __init__(self, cfg):
         """
         Architecture for NeRF MLP without View Dependence
@@ -337,8 +337,6 @@ class NeuralRadianceField(torch.nn.Module):
     """
     def forward(self, ray_bundle):
         embedding_xyz = self.harmonic_embedding_xyz(ray_bundle.sample_points.view(-1, 3))
-        # import ipdb
-        # ipdb.set_trace()
         x = self.MLP(x=embedding_xyz, z=embedding_xyz) # x = input, z = skip connection
         x = self.final_linear(x)
         density = self.relu(x[:, 0].unsqueeze(-1))
@@ -350,7 +348,7 @@ class NeuralRadianceField(torch.nn.Module):
 
 
 # TODO (Q4.1): Implement NeRF MLP with View Dependence
-class NeuralRadianceField_withView(torch.nn.Module):
+class NeuralRadianceField(torch.nn.Module):
     def __init__(self, cfg):
         """
         Architecture for NeRF MLP without View Dependence
@@ -382,7 +380,7 @@ class NeuralRadianceField_withView(torch.nn.Module):
         self.xyz_MLP = MLPWithInputSkips(
             n_layers = cfg.n_layers_xyz, # number of layers in MLP
             input_dim = embedding_dim_xyz, # the Harmonic embedding layer between the input and the 1st hidden layer of MLP
-            output_dim = None, # seems to not be used in MLPWithInputSkips
+            # output_dim = None, # seems to not be used in MLPWithInputSkips
             skip_dim = embedding_dim_xyz, # the layer which gets used as skip connection
             hidden_dim = cfg.n_hidden_neurons_xyz, # output size of each layer
             input_skips = [4], # list of layers where skip connection is added eg. [4] as per NERF paper
@@ -417,12 +415,9 @@ class NeuralRadianceField_withView(torch.nn.Module):
 
         # making the transition
         embedding_dir = self.harmonic_embedding_dir(ray_bundle.directions).unsqueeze(1)
-        embedding_dir = torch.tile(embedding_dir, (1, feature.shape[1], 1))
+        embedding_dir = torch.tile(embedding_dir, (1, feature.shape[1], 1)).view(-1, embedding_dir.shape[-1])
         concat_xyz_and_dir = torch.cat((embedding_dir, feature), dim=-1)
-        feature = self.feature_MLP(x=concat_xyz_and_dir, z=concat_xyz_and_dir)
-
-        # Feature MLP
-        feature = self.feature_MLP(feature)
+        feature = self.feature_MLP(concat_xyz_and_dir)
 
         out = {'density': density, 'feature': feature}
 
@@ -505,5 +500,5 @@ implicit_dict = {
     'nerf': NeuralRadianceField,
     'sdf_surface': SDFSurface,
     'neural_surface': NeuralSurface,
-    'nerf_with_view': NeuralRadianceField_withView,
+    'nerf_without_view': NeuralRadianceField_without_view,
 }
