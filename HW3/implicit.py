@@ -325,7 +325,7 @@ class NeuralRadianceField_without_view(torch.nn.Module):
             # output_dim = None, # seems to not be used in MLPWithInputSkips
             skip_dim = embedding_dim_xyz, # dimension of skip connection which gets added to layer: in our case it's the input_dim
             hidden_dim = cfg.n_hidden_neurons_xyz, # output size of each layer
-            input_skips = cfg.append_xyz, # list of layers where skip connection is added eg. [4] as per NERF paper
+            input_skips = [4], # list of layers where skip connection is added eg. [4] as per NERF paper
         )
         self.final_linear = torch.nn.Linear(cfg.n_hidden_neurons_xyz, 4) # as cfg.n_hidden_neurons_xyz = hidden_dim
 
@@ -431,7 +431,35 @@ class NeuralSurface(torch.nn.Module):
     ):
         super().__init__()
         # TODO (Q6): Implement Neural Surface MLP to output per-point SDF
+        self.harmonic_embedding_xyz = HarmonicEmbedding(3, cfg.n_harmonic_functions_xyz)
+        embedding_dim_xyz = self.harmonic_embedding_xyz.output_dim
+
+        # MLP for xyz (no view dependence) equivalent to constructing upto 8th layer of MLP shown in NERF paper
+        self.MLP_dist_or_color = MLPWithInputSkips(
+            n_layers = cfg.n_layers_distance, # number of layers in MLP
+            input_dim = embedding_dim_xyz, # the Harmonic embedding layer between the input and the 1st hidden layer of MLP
+            # output_dim = None, # seems to not be used in MLPWithInputSkips
+            skip_dim = embedding_dim_xyz, # dimension of skip connection which gets added to layer: in our case it's the input_dim
+            hidden_dim = cfg.n_hidden_neurons_distance, # output size of each layer
+            input_skips = [4], # list of layers where skip connection is added eg. [4] as per NERF paper
+        )
+
+        self.final_linear_dist = torch.nn.Linear(cfg.n_hidden_neurons_distance, 1) # as cfg.n_hidden_neurons_xyz = hidden_dim
+
         # TODO (Q7): Implement Neural Surface MLP to output per-point color
+
+        # MLP for xyz (no view dependence) equivalent to constructing upto 8th layer of MLP shown in NERF paper
+        self.MLP_combined = MLPWithInputSkips(
+            n_layers = cfg.n_layers_color, # number of layers in MLP
+            input_dim = cfg.n_hidden_neurons_distance, # the Harmonic embedding layer between the input and the 1st hidden layer of MLP
+            # output_dim = None, # seems to not be used in MLPWithInputSkips
+            skip_dim = 0, # dimension of skip connection which gets added to layer: in our case it's the input_dim
+            hidden_dim = cfg.n_hidden_neurons_color, # output size of each layer
+            input_skips = [], # list of layers where skip connection is added eg. [4] as per NERF paper
+        )
+
+        self.final_linear_color = torch.nn.Linear(cfg.n_hidden_neurons_color, 3)
+        self.sigmoid = torch.nn.Sigmoid()
 
     def get_distance(
         self,
@@ -443,7 +471,10 @@ class NeuralSurface(torch.nn.Module):
             distance: N X 1 Tensor, where N is number of input points
         '''
         points = points.view(-1, 3)
-        pass
+        embedding_xyz = self.harmonic_embedding_xyz(points)
+        x = self.MLP_dist_or_color(x=embedding_xyz, z=embedding_xyz)
+        x = self.final_linear_dist(x)
+        return x
 
     def get_color(
         self,
@@ -455,7 +486,13 @@ class NeuralSurface(torch.nn.Module):
             distance: N X 3 Tensor, where N is number of input points
         '''
         points = points.view(-1, 3)
-        pass
+        # pass
+        embedding_xyz = self.harmonic_embedding_xyz(points)
+        x = self.MLP_dist_or_color(x=embedding_xyz, z=embedding_xyz)
+        x = self.MLP_combined(x=x, z=x)
+        x = self.final_linear_color(x)
+        x = self.sigmoid(x)
+        return x
 
     def get_distance_color(
         self,
@@ -468,6 +505,16 @@ class NeuralSurface(torch.nn.Module):
         You may just implement this by independent calls to get_distance, get_color
             but, depending on your MLP implementation, it maybe more efficient to share some computation
         '''
+        points = points.view(-1, 3)
+        embedding_xyz = self.harmonic_embedding_xyz(points)
+        x = self.MLP_dist_or_color(x=embedding_xyz, z=embedding_xyz)
+        distance = self.final_linear_dist(x)
+
+        x = self.MLP_combined(x=x, z=x)
+        color = self.final_linear_color(x)
+        color = self.sigmoid(color)
+
+        return distance, color
 
     def forward(self, points):
         return self.get_distance(points)

@@ -34,8 +34,8 @@ training:
 
   render_interval: 500
 
-  inter_weight: 0.1
-  eikonal_weight: 0.02
+  inter_weight: 0.2
+  eikonal_weight: 0.04
   bounds: [[-4, -4, -4], [4, 4, 4]]
 
 implicit_function:
@@ -43,10 +43,10 @@ implicit_function:
 
   n_harmonic_functions_xyz: 4
 
-  n_layers_distance: 6
+  n_layers_distance: 8
   n_hidden_neurons_distance: 128
   append_distance: []
 
-  n_layers_color: 2
+  n_layers_color: 4
   n_hidden_neurons_color: 128
   append_color: []

@@ -176,7 +176,29 @@ class SphereTracingRenderer(torch.nn.Module):
         #   in order to compute intersection points of rays with the implicit surface
         # 2) Maintain a mask with the same batch dimension as the ray origins,
         #   indicating which points hit the surface, and which do not
-        pass
+
+        # Use formula : points = origins + t*directions
+        # init t vector (N, 1) and points (N, 3)
+        t = torch.zeros(origins.shape[0], 1).to(origins.device)
+        points = torch.zeros_like(origins)
+        # define a threshold to stop the sphere tracing
+        threshold = 1e-8
+
+        #? Use self.near and self.far too?
+
+        for _ in range(self.max_iters):
+            points = origins + t*directions
+
+            distance_to_surface = implicit_fn(points).view(origins.shape[0], 1)
+            mask = torch.where(distance_to_surface < threshold, True, False)
+
+            # if all rays hit the surface, break out of loop
+            if mask.sum() == origins.shape[0]:
+                break
+
+            t += distance_to_surface
+
+        return points, mask
 
     def forward(
         self,
@@ -226,7 +248,19 @@ class SphereTracingRenderer(torch.nn.Module):
 
 def sdf_to_density(signed_distance, alpha, beta):
     # TODO (Q7): Convert signed distance to density with alpha, beta parameters
-    pass
+    """
+    signed_distance.shape = (N, 1)
+    alpha.shape = (N, 1)
+    beta.shape = (N, 1)
+    """
+    signed_distance = -signed_distance
+    density = torch.where(
+        signed_distance < 0,
+        0.5 * torch.exp(signed_distance / beta),
+        1 - 0.5 * torch.exp(-signed_distance / beta)
+    )
+
+    return alpha * density
 
 class VolumeSDFRenderer(VolumeRenderer):
     def __init__(
@@ -263,7 +297,7 @@ class VolumeSDFRenderer(VolumeRenderer):
 
             # Call implicit function with sample points
             distance, color = implicit_fn.get_distance_color(cur_ray_bundle.sample_points)
-            density = None # TODO (Q7): convert SDF to density
+            density = sdf_to_density(distance, self.alpha, self.beta)
 
             # Compute length of each ray segment
             depth_values = cur_ray_bundle.sample_lengths[..., 0]
