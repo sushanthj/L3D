@@ -122,6 +122,8 @@ def get_nerf_datasets(
     ]
 
     train_idx, val_idx, test_idx = train_data["split"]
+    # train_idx is a list from 0 to 99 (100 views). We can subsample it as well
+    # train_idx = train_idx[::5]
 
     train_dataset, val_dataset, test_dataset = [
         ListDataset(

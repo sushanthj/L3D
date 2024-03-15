@@ -253,14 +253,17 @@ def sdf_to_density(signed_distance, alpha, beta):
     alpha.shape = (N, 1)
     beta.shape = (N, 1)
     """
-    signed_distance = -signed_distance
-    density = torch.where(
-        signed_distance < 0,
-        0.5 * torch.exp(signed_distance / beta),
-        1 - 0.5 * torch.exp(-signed_distance / beta)
-    )
+    # signed_distance = -signed_distance
+    # density = torch.where(
+    #     signed_distance < 0,
+    #     0.5 * torch.exp(signed_distance / beta),
+    #     1 - 0.5 * torch.exp(-signed_distance / beta)
+    # )
+    lap_dist = torch.distributions.laplace.Laplace(0, beta)
 
-    return alpha * density
+    return alpha * lap_dist.cdf(-signed_distance)
+
+    # return alpha * density
 
 class VolumeSDFRenderer(VolumeRenderer):
     def __init__(

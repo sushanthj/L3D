@@ -416,6 +416,7 @@ class NeuralRadianceField(torch.nn.Module):
         # making the transition
         embedding_dir = self.harmonic_embedding_dir(ray_bundle.directions).unsqueeze(1)
         embedding_dir = torch.tile(embedding_dir, (1, feature.shape[1], 1)).view(-1, embedding_dir.shape[-1])
+        # embedding_dir = embedding_dir.repeat_interleave(feature.shape[1], dim=1).view(-1, embedding_dir.shape[-1])
         concat_xyz_and_dir = torch.cat((embedding_dir, feature), dim=-1)
         feature = self.feature_MLP(concat_xyz_and_dir)
 
