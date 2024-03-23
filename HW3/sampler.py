@@ -37,7 +37,7 @@ class StratifiedRaysampler(torch.nn.Module):
         origins_expanded = origins_expanded.expand(-1, self.n_pts_per_ray, -1)  # Shape: (N, D, 3)
         directions_expanded = ray_bundle.directions.unsqueeze(1)  # Shape: (N, 1, 3)
         directions_expanded = directions_expanded.expand(-1, self.n_pts_per_ray, -1)  # Shape: (N, D, 3)
-        # conver z_vals to shape Shape: (1, D, 1)
+        # convert z_vals to shape Shape: (1, D, 1)
         z_vals_expanded = z_vals.expand(ray_bundle.origins.shape[0], -1).unsqueeze(-1)  # Shape: (1, D, 1)
 
         # Compute sample points

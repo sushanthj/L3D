@@ -25,7 +25,7 @@ class VolumeRenderer(torch.nn.Module):
 
         Args:
             deltas : distance between each sample (self._chunk_size, n_pts, 1)
-            rays_density (torch.Tensor): (self._chunk_size, n_pts, 1)
+            rays_density (torch.Tensor): (self._chunk_size, n_pts, 1) predicting density values of each sample (from NERF MLP)
             eps (float, optional): Defaults to 1e-10.
 
         Returns:
@@ -37,6 +37,7 @@ class VolumeRenderer(torch.nn.Module):
         transmittances.append(torch.ones((num_rays, 1)).to(deltas.device)) # first transmittance is 1
 
         for i in range(1, num_sample_points):
+            # recursive formula for transmittance
             transmittances.append(transmittances[i-1] * torch.exp(-rays_density[:, i-1] * deltas[:, i-1] + eps))
 
         # TODO (1.5): Compute weight used for rendering from transmittance and alpha
@@ -90,14 +91,15 @@ class VolumeRenderer(torch.nn.Module):
             cur_ray_bundle = sampler(cur_ray_bundle)
             n_pts = cur_ray_bundle.sample_shape[1] # number of sample pts along each ray
 
-            # Call implicit function with sample points
+            # Call implicit function with sample points (NERF MLP is the implicit function here)
             implicit_output = implicit_fn(cur_ray_bundle) # gives the signed_distance for the query points
-            density = implicit_output['density'] # shape = (self._chunk_size*n_pts, 1) : The density value of that discrete volume
-            feature = implicit_output['feature'] # shape = (self._chunk_size*n_pts, 3) : Emittance for each discrete volume for RGB channels
+            predicted_density_for_all_samples_for_all_rays_in_chunk = implicit_output['density'] # shape = (self._chunk_size*n_pts, 1) : The density value of that discrete volume
+            predicted_colors_for_all_samples_for_all_rays_in_chunk = implicit_output['feature'] # shape = (self._chunk_size*n_pts, 3) : Emittance for each discrete volume for RGB channels
 
             # Compute length of each ray segment
             # NOTE: cur_ray_bundle.sample_lengths.shape = (self._chunk_size, n_pts, n_pts)
             depth_values = cur_ray_bundle.sample_lengths[..., 0] # depth_values.shape = (self._chunk_size, n_pts)
+            # deltas are the distance between each sample
             deltas = torch.cat(
                 (
                     depth_values[..., 1:] - depth_values[..., :-1],
@@ -106,25 +108,25 @@ class VolumeRenderer(torch.nn.Module):
                 dim=-1,
             )[..., None]
 
-            # Compute aggregation weights (Absorption for each voulme)
+            # Compute aggregation weights (weights = overall transmittance for all rays in the chunk)
             weights = self._compute_weights(
                 deltas.view(-1, n_pts, 1), # shape = (self._chunk_size, n_pts, 1)
-                density.view(-1, n_pts, 1) # shape = (self._chunk_size, n_pts, 1)
+                predicted_density_for_all_samples_for_all_rays_in_chunk.view(-1, n_pts, 1) # shape = (self._chunk_size, n_pts, 1)
             )
 
             # TODO (1.5): Render (color) features using weights
-            # weiths.shape = (self._chunk_size, n_pts, 1)
-            # feature.shape = (self._chunk_size*n_pts, 3)
-            feature = self._aggregate(weights, feature.view(-1, n_pts, 3))
+            # weights.shape = (self._chunk_size, n_pts, 1)
+            # color.shape = (self._chunk_size*n_pts, 3)
+            color_of_all_rays = self._aggregate(weights, predicted_colors_for_all_samples_for_all_rays_in_chunk.view(-1, n_pts, 3)) # feature = RGB color
 
             # TODO (1.5): Render depth map
             # depth_values.shape = (self._chunk_size, n_pts)
-            depth = self._aggregate(weights, depth_values.view(-1, n_pts, 1))
+            depth_of_all_rays = self._aggregate(weights, depth_values.view(-1, n_pts, 1))
 
             # Return
             cur_out = {
-                'feature': feature,
-                'depth': depth,
+                'feature': color_of_all_rays,
+                'depth': depth_of_all_rays,
             }
             # shape = (N, 3) for feature and (N, 1) for depth
 
