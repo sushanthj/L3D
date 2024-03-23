@@ -36,11 +36,13 @@ class VolumeRenderer(torch.nn.Module):
         transmittances = []
         transmittances.append(torch.ones((num_rays, 1)).to(deltas.device)) # first transmittance is 1
 
+        #! Find the transmittance for each discrete volume
         for i in range(1, num_sample_points):
             # recursive formula for transmittance
             transmittances.append(transmittances[i-1] * torch.exp(-rays_density[:, i-1] * deltas[:, i-1] + eps))
 
         # TODO (1.5): Compute weight used for rendering from transmittance and alpha
+        #! Multiply transmittance with the (1-e^(-sigma(x)*delta_x) part of the equation
         transmittances_stacked = torch.stack(transmittances, dim=1)
         # the below line implements the T(x, x_t) * (1 - e^{−σ(x) * δx}) part of the equation => we'll call this 'weights'
         return transmittances_stacked * (1 - torch.exp(-rays_density*deltas+eps)) # -> weights
@@ -52,8 +54,8 @@ class VolumeRenderer(torch.nn.Module):
         """
 
         Args:
-            weights (torch.Tensor): (self._chunk_size, n_pts, 1) (Absorption for each channel)
-            rays_feature (torch.Tensor): (self._chunk_size*n_pts, 3) (Emittance for each channel)
+            weights (torch.Tensor): (self._chunk_size, n_pts, 1) (Overall Transmittance for each ray)
+            rays_feature (torch.Tensor): (self._chunk_size*n_pts, 3) rays_feature = RGB color or depth
 
         Returns:
             feature : Final Attribute (color or depth) for each ray
